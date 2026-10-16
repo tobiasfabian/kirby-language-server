@@ -1,0 +1,39 @@
+{
+	"identifier": "tobiasfabian.kirby",
+	"name": "Kirby",
+	"organization": "Tobias Fabian",
+	"description": "Completion, navigation and warnings for snippets in Kirby CMS projects.",
+	"version": "0.1.0",
+	"license": "MIT",
+	"repository": "https://github.com/tobiasfabian/kirby-language-server",
+	"bugs": "https://github.com/tobiasfabian/kirby-language-server/issues",
+	"categories": [
+		"completions",
+		"issues"
+	],
+	"main": "main.js",
+	"activationEvents": [
+		"onLanguage:php"
+	],
+	"entitlements": {
+		"process": true
+	},
+	"commands": {
+		"editor": [
+			{
+				"title": "Open Snippet, Collection or Translation",
+				"command": "tobiasfabian.kirby.open",
+				"shortcut": "cmd-opt-ctrl-o",
+				"when": "editorHasFocus"
+			}
+		]
+	},
+	"config": [
+		{
+			"key": "tobiasfabian.kirby.nodePath",
+			"title": "Node.js path",
+			"type": "path",
+			"description": "The language server runs on Node.js 18 or newer. Leave empty to use the node your login shell finds (nvm included)."
+		}
+	]
+}

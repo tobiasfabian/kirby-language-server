@@ -1,0 +1,26 @@
+{
+  "name": "kirby-language-server",
+  "version": "0.1.0",
+  "description": "Language server for Kirby CMS projects: completion, navigation and warnings for snippets.",
+  "type": "module",
+  "scripts": {
+    "build": "node ./build.mjs",
+    "dev": "node ./build.mjs --dev",
+    "lint": "eslint .",
+    "test": "node --test"
+  },
+  "author": "Tobias Wolf (https://tobiaswolf.me)",
+  "license": "MIT",
+  "repository": "github:tobiasfabian/kirby-language-server",
+  "dependencies": {
+    "vscode-languageserver": "^10.1.2",
+    "vscode-languageserver-textdocument": "^1.0.15"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "esbuild": "0.28.1",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0"
+  }
+}

@@ -1,0 +1,7 @@
+fields:
+  related:
+    type: pages
+    query: kirby.collection("projects")
+  other:
+    type: pages
+    query: kirby.collection("unknown")
