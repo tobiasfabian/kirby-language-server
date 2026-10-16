@@ -1,4 +1,4 @@
-**Kirby** helps with snippets, collections and translations in [Kirby CMS](https://getkirby.com) projects.
+**Kirby** helps with snippets, collections, translations and blueprints in [Kirby CMS](https://getkirby.com) 6 projects.
 
 ## What it does
 
@@ -11,7 +11,7 @@ When you type `snippet('`, `collection('` or `t('` (also `tt('`, `tc('`) in a PH
 - **Open Snippet, Collection or Translation** (⌃⌥⌘O, or from the command palette) opens the file the name under the cursor refers to, for translation keys the line in the language file.
 - **Warnings** mark calls whose snippet, collection or translation key doesn't exist. `t('key', 'Fallback')` with a fallback text isn't flagged. If a plugin loads its translations at runtime (e.g. from JSON files), missing keys are only a hint, because they might come from there.
 
-In blueprints, `type: ` offers the field types (and in Kirby 4 and 5 the section types under `sections:`). Kirby 6's new fields like `pagelist` and `pagepicker` are offered when the project runs Kirby 6.
+In blueprints, `type: ` offers Kirby 6's field types, such as `pagelist` and `pagepicker`. `pages`, `files` and `users` are shown as deprecated aliases.
 
 Fallbacks such as `snippet(['m-card-project', 'm-card'])` are understood. Names built at runtime, like `snippet('blocks/' . $block->type())`, are not checked.
 

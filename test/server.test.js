@@ -225,7 +225,6 @@ test('completes field types in blueprints', async () => {
 		position: { line, character: text.split('\n')[line].indexOf('pages') + 2 },
 	});
 
-	assert.ok(items.some((item) => item.label === 'writer'));
-	assert.equal(items.find((item) => item.label === 'pages').textEdit.newText, 'pages');
-	assert.match(items.find((item) => item.label === 'pages').documentation.value, /panel\/fields\/pages/);
+	assert.ok(items.some((item) => item.label === 'pagelist'));
+	assert.equal(items.find((item) => item.label === 'pages').detail, 'deprecated: use pagepicker');
 });

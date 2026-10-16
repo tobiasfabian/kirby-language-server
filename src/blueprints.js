@@ -1,43 +1,48 @@
 /**
- * Completion for `type:` in blueprints.
+ * Reading positions in blueprints, and completion for `type:`.
  *
- * The lists are fixed, taken from Kirby's Core.php. Kirby 6 turned sections
- * into fields (https://getkirby.com/releases/6/blueprints), so it has one list;
- * Kirby 4 and 5 tell fields and sections apart.
+ * The server is built for Kirby 6, where sections became fields
+ * (https://getkirby.com/releases/6/blueprints).
  */
 
-const KIRBY_5_FIELDS = [
-	'blocks', 'checkboxes', 'color', 'date', 'email', 'entries', 'files', 'gap', 'group', 'headline',
-	'hidden', 'info', 'layout', 'line', 'link', 'list', 'multiselect', 'number', 'object', 'pages',
-	'radio', 'range', 'select', 'slug', 'stats', 'structure', 'tags', 'tel', 'text', 'textarea',
-	'time', 'toggle', 'toggles', 'url', 'users', 'writer',
-];
-
-const KIRBY_5_SECTIONS = ['fields', 'files', 'info', 'pages', 'stats'];
-
-const KIRBY_6_FIELDS = [
+// Kirby 6 field types (pages, files and users are deprecated aliases)
+const FIELD_TYPES = [
 	'blocks', 'buttons', 'checkboxes', 'color', 'date', 'email', 'entries', 'filelist', 'filepicker', 'gap',
 	'group', 'headline', 'hidden', 'info', 'layout', 'line', 'link', 'list', 'multiselect', 'number',
 	'object', 'pagelist', 'pagepicker', 'password', 'radio', 'range', 'select', 'slug', 'stats', 'structure',
 	'tags', 'tel', 'text', 'textarea', 'time', 'toggle', 'toggles', 'url', 'userpicker', 'writer',
 ];
 
-// Deprecated aliases in Kirby 6
-const KIRBY_6_ALIASES = { files: 'filepicker', pages: 'pagepicker', users: 'userpicker' };
+const ALIASES = { files: 'filepicker', pages: 'pagepicker', users: 'userpicker' };
+
+// Types with a page in the field reference (https://getkirby.com/docs/reference/panel/fields)
+const DOCUMENTED = new Set([
+	'blocks', 'checkboxes', 'color', 'date', 'email', 'entries', 'files', 'gap', 'headline', 'hidden',
+	'info', 'layout', 'line', 'link', 'list', 'multiselect', 'number', 'object', 'pages', 'radio', 'range',
+	'select', 'slug', 'stats', 'structure', 'tags', 'tel', 'text', 'textarea', 'time', 'toggle', 'toggles',
+	'url', 'users', 'writer',
+]);
 
 /**
- * The keys above a line, nearest first, found by indentation.
- * A list item (`- …`) counts as the key `-`.
+ * @typedef {object} Ancestor
+ * @property {string} key the key, or `-` for a list item
+ * @property {number} indent
+ * @property {number} line 0-based line index
+ */
+
+/**
+ * The keys above a position, nearest first, found by indentation:
+ * each is the next line above that is indented less than the one before.
  * @param {string[]} lines
  * @param {number} from index of the line to start at, going up
  * @param {number} indent only lines indented less than this are parents
- * @param {number} count how many parents to return
+ * @returns {Ancestor[]}
  */
-function parents(lines, from, indent, count) {
+export function ancestors(lines, from, indent) {
 	const keys = [];
 	let level = indent;
 
-	for (let i = from; i >= 0 && keys.length < count; i--) {
+	for (let i = from; i >= 0 && level > 0; i--) {
 		const trimmed = lines[i].trimStart();
 
 		if (trimmed === '' || trimmed.startsWith('#')) {
@@ -47,7 +52,7 @@ function parents(lines, from, indent, count) {
 		const lineIndent = lines[i].length - trimmed.length;
 
 		if (lineIndent < level) {
-			keys.push(trimmed.startsWith('- ') || trimmed === '-' ? '-' : trimmed.split(':')[0].trim());
+			keys.push({ key: trimmed.startsWith('- ') || trimmed === '-' ? '-' : trimmed.split(':')[0].trim(), indent: lineIndent, line: i });
 			level = lineIndent;
 		}
 	}
@@ -56,70 +61,56 @@ function parents(lines, from, indent, count) {
 }
 
 /**
- * If the cursor is in the value of a `type:` key, returns the part typed so far,
- * where it starts and the key the item sits in (`fields`, `sections`, … or null at the top)
+ * Where the cursor is: the text of its line before it, the lines above and their keys
  * @param {string} text
  * @param {number} offset
- * @returns {{ prefix: string, start: number, container: string | null } | null}
+ */
+export function positionInfo(text, offset) {
+	const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
+	const lines = text.slice(0, lineStart).split('\n').slice(0, -1);
+
+	return { before: text.slice(lineStart, offset), lines, lineStart };
+}
+
+/**
+ * If the cursor is in the value of a `type:` key of a field, returns the part
+ * typed so far and where it starts
+ * @param {string} text
+ * @param {number} offset
+ * @returns {{ prefix: string, start: number } | null}
  */
 export function typeContext(text, offset) {
-	const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
-	const match = text.slice(lineStart, offset).match(/^(\s*)(-\s+)?type:\s*(["']?)([\w-]*)$/);
+	const { before, lines } = positionInfo(text, offset);
+	const match = before.match(/^(\s*)(-\s+)?type:\s*(["']?)([\w-]*)$/);
 
 	if (match === null) {
 		return null;
 	}
 
-	const lines = text.slice(0, lineStart).split('\n').slice(0, -1);
-	const prefix = match[4];
-	let container;
+	// The container is the key above the field: `fields`, or `columns` of a table.
+	// For `- type: …` the list item itself is the field.
+	const keys = ancestors(lines, lines.length - 1, match[1].length);
+	const container = match[2] === undefined ? keys[1] : keys[0];
+	const isTopOfFile = keys.length === 0;
 
-	if (match[2] !== undefined) {
-		// `- type: …`: the list item is the field, its parent the container
-		container = parents(lines, lines.length - 1, match[1].length, 1)[0] ?? null;
-	} else {
-		// `type: …` inside a named item: its parent is the container
-		const keys = parents(lines, lines.length - 1, match[1].length, 2);
-		container = keys.length === 0 ? null : keys[1] ?? null;
-
-		// At the top of a file, the file itself is the field (fields/*.yml) or section
-		if (keys.length === 0) {
-			container = null;
-		} else if (keys.length === 1) {
-			container = keys[0] === '-' ? null : '';
-		}
+	if (isTopOfFile === false && container?.key !== 'fields' && container?.key !== 'columns') {
+		return null;
 	}
 
-	return { prefix, start: offset - prefix.length, container };
+	return { prefix: match[4], start: offset - match[4].length };
 }
 
 /**
- * The types to offer for a container in a blueprint file
- * @param {number} major Kirby's major version
- * @param {string | null} container `fields`, `sections`, another key, or null at the top of the file
- * @param {string} file path of the blueprint
- * @returns {{ name: string, kind: 'field' | 'section', replacement?: string }[]}
+ * The field types to offer, with the replacement of deprecated aliases and a link to the docs
+ * @returns {{ name: string, replacement?: string, docs: string }[]}
  */
-export function typesFor(major, container, file) {
-	const isSectionFile = /[/\\]sections[/\\][^/\\]+\.ya?ml$/.test(file);
-	const isSection = container === 'sections' || (container === null && isSectionFile);
-	// Table columns take field types, too
-	const isField = container === 'fields' || container === 'columns' || (container === null && isSectionFile === false);
+export function fieldTypes() {
+	const docs = (name) => DOCUMENTED.has(name)
+		? `https://getkirby.com/docs/reference/panel/fields/${name}`
+		: 'https://getkirby.com/releases/6/blueprints';
 
-	if (major >= 6) {
-		if (isField === false && isSection === false) {
-			return [];
-		}
-
-		return [
-			...KIRBY_6_FIELDS.map((name) => ({ name, kind: 'field' })),
-			...Object.entries(KIRBY_6_ALIASES).map(([name, replacement]) => ({ name, kind: 'field', replacement })),
-		];
-	}
-
-	if (isSection === true) {
-		return KIRBY_5_SECTIONS.map((name) => ({ name, kind: 'section' }));
-	}
-
-	return isField === true ? KIRBY_5_FIELDS.map((name) => ({ name, kind: 'field' })) : [];
+	return [
+		...FIELD_TYPES.map((name) => ({ name, docs: docs(name) })),
+		...Object.entries(ALIASES).map(([name, replacement]) => ({ name, replacement, docs: docs(replacement) })),
+	];
 }

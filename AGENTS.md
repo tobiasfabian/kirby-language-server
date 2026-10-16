@@ -12,6 +12,7 @@ A language server for Kirby CMS projects (`src/`) and the Nova extension that st
 
 ## Conventions
 
+- Built for Kirby 6 only. Older Kirby versions don't matter: no version checks, no special cases. The source of truth is Kirby 6's documentation and release notes (https://getkirby.com/releases/6/blueprints), not its alpha source code.
 - Plain modern JavaScript with JSDoc, no TypeScript. Tabs, as `.editorconfig` and ESLint say.
 - The server only reads files. It never starts Kirby or runs PHP, so it stays fast and safe in any project.
 - No false warnings: a warning is only shown for literal names. Names built at runtime are skipped. Registered snippets and collections are read with the small parser in `src/php.js`, which knows the nesting: `'collections'` inside `'api' => [...]` are API collections, not Kirby collections.
