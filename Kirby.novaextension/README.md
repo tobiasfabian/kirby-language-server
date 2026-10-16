@@ -11,6 +11,8 @@ When you type `snippet('`, `collection('` or `t('` (also `tt('`, `tc('`) in a PH
 - **Open Snippet, Collection or Translation** (⌃⌥⌘O, or from the command palette) opens the file the name under the cursor refers to, for translation keys the line in the language file.
 - **Warnings** mark calls whose snippet, collection or translation key doesn't exist. `t('key', 'Fallback')` with a fallback text isn't flagged. If a plugin loads its translations at runtime (e.g. from JSON files), missing keys are only a hint, because they might come from there.
 
+In blueprints, `type: ` offers the field types (and in Kirby 4 and 5 the section types under `sections:`). Kirby 6's new fields like `pagelist` and `pagepicker` are offered when the project runs Kirby 6.
+
 Fallbacks such as `snippet(['m-card-project', 'm-card'])` are understood. Names built at runtime, like `snippet('blocks/' . $block->type())`, are not checked.
 
 Hover and ⌘-click don't work while Nova's built-in PHP language server (Intelephense) is on: Nova then asks only Intelephense. Without it, hover works, but ⌘-click still doesn't jump. That's why opening is a command of its own.

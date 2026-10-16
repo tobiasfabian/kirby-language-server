@@ -8,6 +8,7 @@ For `snippet('…')`, `collection('…')` and `t('…')`/`tt('…')`/`tc('…')`
 	- snippets from `site/snippets`, plugins, the config and Kirby's block snippets, with the variables they expect
 	- collections from `site/collections`, plugins and `'extensions'` in the config, with their signature
 	- translation keys from `site/languages`, plugins and the config, then Kirby's own from `kirby/i18n/translations`, with their text in each language
+- **Completion of `type:`** in blueprints: the field types of the project's Kirby version, or the section types under `sections:` in Kirby 4 and 5 (`src/blueprints.js`)
 - **Jump to Definition** to the file (or the line of a collection defined as a closure, or of a translation key)
 - **Hover** with the same information as the completion
 - **Code lenses** with each snippet's or collection's origin above its line (not shown in Nova)
@@ -37,6 +38,7 @@ The extension needs Node.js 18 or newer. It looks for `node` through the login s
 
 ```
 src/
+├── blueprints.js field and section types for type: in blueprints
 ├── calls.js      finds snippet() and collection() calls
 ├── php.js        reads what plugins and the config register
 ├── project.js    reads snippets, collections and translations from the project
@@ -58,4 +60,5 @@ The same pattern (read the project, complete, jump, warn) fits more of Kirby:
 - translation keys missing in some of the languages
 - `option('…')`
 - template names and `extends: fields/…` in blueprints
+- field and section types registered by plugins
 - site methods from `*-methods.stub.php`

@@ -1,7 +1,9 @@
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import fs from 'node:fs';
 import {
 	CompletionItemKind,
+	CompletionItemTag,
 	createConnection,
 	DiagnosticSeverity,
 	MarkupKind,
@@ -10,6 +12,7 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
+import { typeContext, typesFor } from './blueprints.js';
 import { completionContext, findCalls, nameAt } from './calls.js';
 import { collectionSignature, findSites, listCollections, listSnippets, listTranslations, snippetProps } from './project.js';
 
@@ -70,6 +73,54 @@ function cached(key, read) {
 	cache.set(key, { time: Date.now(), value });
 
 	return value;
+}
+
+/**
+ * Kirby's major version next to a site (from kirby/composer.json), 5 if unknown
+ * @param {string} site
+ */
+function kirbyMajor(site) {
+	return cached('kirby-version:' + site, () => {
+		try {
+			const { version } = JSON.parse(fs.readFileSync(path.join(path.dirname(site), 'kirby', 'composer.json'), 'utf8'));
+			return Number.parseInt(version, 10) || 5;
+		} catch {
+			return 5;
+		}
+	});
+}
+
+/**
+ * Completion for `type:` in a blueprint
+ * @param {TextDocument} document
+ * @param {{ line: number, character: number }} position
+ * @param {string} site
+ */
+function typeCompletion(document, position, site) {
+	const context = typeContext(document.getText(), document.offsetAt(position));
+
+	if (context === null) {
+		return null;
+	}
+
+	const major = kirbyMajor(site);
+	const range = { start: document.positionAt(context.start), end: position };
+
+	return typesFor(major, context.container, fileURLToPath(document.uri)).map(({ name, kind, replacement }) => ({
+		label: name,
+		kind: CompletionItemKind.EnumMember,
+		detail: replacement === undefined ? kind : `${kind}, deprecated: use ${replacement}`,
+		tags: replacement === undefined ? [] : [CompletionItemTag.Deprecated],
+		documentation: {
+			kind: MarkupKind.Markdown,
+			value: major >= 6
+				? `[Kirby 6 blueprints](https://getkirby.com/releases/6/blueprints)`
+				: `[${name} ${kind}](https://getkirby.com/docs/reference/panel/${kind}s/${name})`,
+		},
+		sortText: (replacement === undefined ? '0' : '1') + name,
+		filterText: name,
+		textEdit: { range, newText: name },
+	}));
 }
 
 /**
@@ -245,7 +296,8 @@ connection.onInitialize((params) => {
 	return {
 		capabilities: {
 			textDocumentSync: TextDocumentSyncKind.Incremental,
-			completionProvider: { triggerCharacters: ['\'', '"', '/'] },
+			// A space for `type: ` in blueprints
+			completionProvider: { triggerCharacters: ['\'', '"', '/', ' '] },
 			definitionProvider: true,
 			hoverProvider: true,
 			codeLensProvider: { resolveProvider: false },
@@ -260,6 +312,15 @@ connection.onInitialized(() => {
 connection.onCompletion(({ textDocument, position }) => {
 	const document = documents.get(textDocument.uri);
 	const site = document ? siteFor(document.uri) : null;
+
+	if (site !== null && /\.ya?ml$/.test(document.uri)) {
+		const types = typeCompletion(document, position, site);
+
+		if (types !== null) {
+			return types;
+		}
+	}
+
 	const context = site ? completionContext(document.getText(), document.offsetAt(position)) : null;
 
 	if (context === null) {

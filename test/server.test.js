@@ -213,3 +213,19 @@ test('checks collections in blueprint queries', async () => {
 	assert.equal(messages.length, 1);
 	assert.match(messages[0], /Collection “unknown” not found/);
 });
+
+test('completes field types in blueprints', async () => {
+	const blueprint = `${project}/public/site/blueprints/pages/default.yml`;
+	const uri = pathToFileURL(blueprint).href;
+	const text = fs.readFileSync(blueprint, 'utf8');
+	const line = text.split('\n').findIndex((row) => row.includes('type: pages'));
+
+	const items = await request('textDocument/completion', {
+		textDocument: { uri },
+		position: { line, character: text.split('\n')[line].indexOf('pages') + 2 },
+	});
+
+	assert.ok(items.some((item) => item.label === 'writer'));
+	assert.equal(items.find((item) => item.label === 'pages').textEdit.newText, 'pages');
+	assert.match(items.find((item) => item.label === 'pages').documentation.value, /panel\/fields\/pages/);
+});
