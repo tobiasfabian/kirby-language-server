@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { collectionSignature, findSites, listCollections, listSnippets, listTranslations, snippetProps } from '../src/project.js';
+import { collectionSignature, findSites, listCollections, listSnippets, listTranslations, snippetProps, snippetVariables } from '../src/project.js';
 
 const project = fileURLToPath(new URL('./fixtures/project', import.meta.url));
 const site = path.join(project, 'public', 'site');
@@ -78,4 +78,12 @@ test('lists translations from languages, plugins and the config', () => {
 	assert.equal(translations.get('project').values.get('de'), '– / Projekt / Projekte');
 	assert.equal(translations.get('contact.send').source, 'plugin');
 	assert.equal(translations.get('footer.copyright').source, 'config');
+});
+
+test('reads a snippet’s variables with type and default', () => {
+	assert.deepEqual(snippetVariables(path.join(site, 'snippets', 'm-card.php')), [
+		{ name: 'page', type: '\\Kirby\\Cms\\Page|null', default: 'null' },
+		{ name: 'size', default: '\'medium\'' },
+	]);
+	assert.deepEqual(snippetVariables(path.join(site, 'snippets', 'o-header.php')), [{ name: 'variant', default: 'null' }]);
 });

@@ -9,6 +9,7 @@ For `snippet('…')`, `collection('…')` and `t('…')`/`tt('…')`/`tc('…')`
 	- collections from `site/collections`, plugins and `'extensions'` in the config, with their signature
 	- translation keys from `site/languages`, plugins and the config, then Kirby's own from `kirby/i18n/translations`, with their text in each language
 - **Completion of `type:`** in blueprints: Kirby 6 field types, with `pages`, `files` and `users` as deprecated aliases (`src/blueprints.js`)
+- **Snippet variables**: in `snippet('m-card', ['…` the keys the snippet expects, with type and default
 - **Jump to Definition** to the file (or the line of a collection defined as a closure, or of a translation key)
 - **Hover** with the same information as the completion
 - **Code lenses** with each snippet's or collection's origin above its line (not shown in Nova)

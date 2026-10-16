@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { completionContext, findCalls, nameAt } from '../src/calls.js';
+import { completionContext, findCalls, nameAt, propsContext } from '../src/calls.js';
 
 const names = (text) => findCalls(text).map((call) => [call.kind, ...call.names.map(({ name }) => name)]);
 
@@ -83,4 +83,17 @@ test('finds the name under the cursor', () => {
 	assert.deepEqual(nameAt(text, text.indexOf('card')), { kind: 'snippet', name: 'm-card', start: 15, end: 21 });
 	assert.equal(nameAt(text, text.indexOf('projects'))?.kind, 'collection');
 	assert.equal(nameAt(text, 2), null);
+});
+
+test('finds the keys of a snippet’s data array', () => {
+	const at = (text) => propsContext(text.replace('▮', ''), text.indexOf('▮'));
+
+	assert.deepEqual(at(`<?php snippet('m-card', ['si▮`), { names: ['m-card'], prefix: 'si', start: 26 });
+	assert.equal(at(`<?php snippet('m-card', ['page' => $page, '▮`)?.prefix, '');
+	assert.deepEqual(at(`<?php snippet('m-card', data: ['▮`)?.names, ['m-card']);
+	assert.deepEqual(at(`<?php snippet(['m-card-project', 'm-card'], ['▮`)?.names, ['m-card-project', 'm-card']);
+	assert.equal(at(`<?php snippet('m-card', ['page' => '▮`), null);
+	assert.equal(at(`<?php snippet('m-card', ['attr' => ['▮`), null);
+	assert.equal(at(`<?php snippet('m-card', ['a' => 1]); echo('▮`), null);
+	assert.equal(at(`<?php snippet('m-card', compact('▮`), null);
 });

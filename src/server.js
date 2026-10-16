@@ -12,8 +12,8 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { fieldTypes, typeContext } from './blueprints.js';
-import { completionContext, findCalls, nameAt } from './calls.js';
-import { collectionSignature, findSites, listCollections, listSnippets, listTranslations, snippetProps } from './project.js';
+import { completionContext, findCalls, nameAt, propsContext } from './calls.js';
+import { collectionSignature, findSites, listCollections, listSnippets, listTranslations, snippetProps, snippetVariables } from './project.js';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -135,6 +135,14 @@ function entriesOf(site, kind) {
 function textsOf(translation, site) {
 	const order = translationsOf(site).languages;
 	return [...translation.values].sort(([a], [b]) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+}
+
+/**
+ * Shortens long code for a one-line detail
+ * @param {string} code
+ */
+function shorten(code) {
+	return code.length > 40 ? code.slice(0, 39) + '…' : code;
 }
 
 /**
@@ -296,6 +304,25 @@ connection.onCompletion(({ textDocument, position }) => {
 		if (types !== null) {
 			return types;
 		}
+	}
+
+	// Keys of the data array: snippet('m-card', ['▮
+	const props = site ? propsContext(document.getText(), document.offsetAt(position)) : null;
+
+	if (props !== null) {
+		const snippets = entriesOf(site, 'snippet');
+		const snippet = props.names.map((name) => snippets.get(name)).find((entry) => entry !== undefined);
+		const range = { start: document.positionAt(props.start), end: position };
+
+		return snippet === undefined ? [] : snippetVariables(snippet.file).map((variable, index) => ({
+			label: variable.name,
+			kind: CompletionItemKind.Property,
+			detail: [variable.type, variable.default === undefined ? undefined : `= ${shorten(variable.default)}`].filter(Boolean).join(' '),
+			documentation: variable.default === undefined ? undefined : { kind: MarkupKind.Markdown, value: '```php\n$' + variable.name + ' ??= ' + variable.default + ';\n```' },
+			sortText: String(index).padStart(3, '0'),
+			filterText: variable.name,
+			textEdit: { range, newText: variable.name },
+		}));
 	}
 
 	const context = site ? completionContext(document.getText(), document.offsetAt(position)) : null;

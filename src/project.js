@@ -514,3 +514,26 @@ export function listTranslations(site) {
 
 	return { translations, kirby, languages, complete };
 }
+
+/**
+ * The variables a snippet expects, with type (from `@var`) and default (from `??=`)
+ * @param {string} file
+ * @returns {{ name: string, type?: string, default?: string }[]}
+ */
+export function snippetVariables(file) {
+	const variables = new Map();
+	const variable = (name) => variables.get(name) ?? variables.set(name, { name }).get(name);
+
+	for (const line of snippetProps(file)) {
+		const typed = line.match(/@var\s+(\S+)\s+\$(\w+)/);
+		const defaulted = line.match(/^\$(\w+)\s*\?\?=\s*(.+?);?$/) ?? line.match(/^\$(\w+)\s*=\s*\$\1\s*\?\?\s*(.+?);?$/);
+
+		if (typed !== null) {
+			variable(typed[2]).type = typed[1];
+		} else if (defaulted !== null) {
+			variable(defaulted[1]).default = defaulted[2];
+		}
+	}
+
+	return [...variables.values()];
+}

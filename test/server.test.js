@@ -228,3 +228,14 @@ test('completes field types in blueprints', async () => {
 	assert.ok(items.some((item) => item.label === 'pagelist'));
 	assert.equal(items.find((item) => item.label === 'pages').detail, 'deprecated: use pagepicker');
 });
+
+test('completes the variables a snippet expects', async () => {
+	const items = await request('textDocument/completion', {
+		textDocument: { uri: templateUri },
+		position: positionOf(`'size' => 'large'`, 3),
+	});
+
+	assert.deepEqual(items.map((item) => item.label), ['page', 'size']);
+	assert.equal(items[1].detail, '= \'medium\'');
+	assert.equal(items[1].textEdit.newText, 'size');
+});

@@ -157,3 +157,79 @@ export function nameAt(text, offset) {
 
 	return null;
 }
+
+/**
+ * If the cursor is in a key of the data array of a snippet call,
+ * `snippet('m-card', ['si▮` or `snippet('m-card', data: ['si▮`,
+ * returns the snippet names, the part of the key typed so far and where it starts
+ * @param {string} text
+ * @param {number} offset
+ * @returns {{ names: string[], prefix: string, start: number } | null}
+ */
+export function propsContext(text, offset) {
+	let result = null;
+
+	for (const match of text.slice(0, offset).matchAll(/\bsnippet\(\s*/g)) {
+		const call = findCalls(text.slice(match.index)).at(0);
+
+		if (call === undefined || call.kind !== 'snippet' || call.more === false) {
+			continue;
+		}
+
+		// After the names: `, [` or `, data: [`
+		const afterNames = match.index + call.names.at(-1).end + 1 + (text[match.index + call.names.at(-1).end + 1] === ']' ? 1 : 0);
+		const array = text.slice(afterNames, offset).match(/^\s*,\s*(?:data\s*:\s*)?\[/);
+
+		if (array === null) {
+			continue;
+		}
+
+		const open = afterNames + array[0].length - 1;
+		let depth = 0;
+		let separator = open + 1;
+		let quote = null;
+		let stringStart = -1;
+		let closed = false;
+
+		for (let i = open + 1; i < offset; i++) {
+			const char = text[i];
+
+			if (quote !== null) {
+				if (char === '\\') {
+					i++;
+				} else if (char === quote) {
+					quote = null;
+				}
+
+				continue;
+			}
+
+			if (char === '\'' || char === '"') {
+				quote = char;
+				stringStart = i;
+			} else if ('[({'.includes(char)) {
+				depth++;
+			} else if (')]}'.includes(char)) {
+				if (depth === 0) {
+					closed = true;
+					break;
+				}
+
+				depth--;
+			} else if (char === ',' && depth === 0) {
+				separator = i + 1;
+			}
+		}
+
+		// Inside an open string at the array's own level, right at the start of an entry
+		if (closed === false && quote !== null && depth === 0 && text.slice(separator, stringStart).trim() === '') {
+			const prefix = text.slice(stringStart + 1, offset);
+
+			if (/^[\w-]*$/.test(prefix) === true) {
+				result = { names: call.names.map(({ name }) => name), prefix, start: stringStart + 1 };
+			}
+		}
+	}
+
+	return result;
+}
