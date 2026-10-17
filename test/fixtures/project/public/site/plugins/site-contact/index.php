@@ -16,6 +16,26 @@ App::plugin('site/contact', [
 	'templates' => [
 		'contact' => __DIR__ . '/templates/contact.php',
 	],
+	'pageMethods' => [
+		/**
+		 * The contact form of the page
+		 */
+		'contactForm' => function (string $name = 'default'): ?Page {
+			return null;
+		},
+	],
+	'siteMethods' => [
+		'contactPage' => fn (): ?Page => page('contact'),
+	],
+	'fieldMethods' => [
+		'toPhone' => function (
+			Field $field,
+			// international or national
+			string $format = 'international'
+		): string {
+			return $field->value();
+		},
+	],
 	'collections' => [
 		'contact-forms' => function () {
 			return []; // 'not-a-collection' => 'x'

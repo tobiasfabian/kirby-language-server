@@ -11,9 +11,9 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { blueprintFields, blueprintReferences, extend, extendsContext, fieldProperties, fieldTypes, isFieldType, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
-import { completionContext, fieldContext, findCalls, nameAt, propsContext } from './calls.js';
-import { collectionSignature, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listDocroot, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
+import { blueprintFields, blueprintReferences, extend, extendsContext, fieldMethods, fieldProperties, fieldTypes, fittingMethods, isFieldType, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
+import { completionContext, fieldContext, fieldMethodContext, findCalls, nameAt, propsContext } from './calls.js';
+import { classMethods, closureInfo, collectionSignature, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listDocroot, listMethods, listModels, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -175,8 +175,84 @@ function blueprintsForVariable(variable, file, site) {
 }
 
 /**
- * Completion for field names after `$page->`, `$site->`, `$block->` or `$this->` (in a model),
- * from the blueprint of the page, site or block. Inserts `name()`.
+ * The fields `$page`, `$site`, `$block` or `$this` has in a file, by name, with the blueprints they're from
+ * @param {'page' | 'site' | 'block' | 'this'} variable
+ * @param {string} file
+ * @param {string} site
+ * @returns {Map<string, import('./blueprints.js').BlueprintField & { blueprints: string[] }>}
+ */
+function fieldsFor(variable, file, site) {
+	const find = blueprintFinder(site);
+	const fields = new Map();
+
+	for (const name of blueprintsForVariable(variable, file, site)) {
+		const blueprint = find(name);
+
+		for (const field of blueprint === null ? [] : cached(`fields:${site}:${name}`, () => blueprintFields(blueprint, find))) {
+			const known = fields.get(field.name);
+			fields.set(field.name, { ...field, blueprints: [...known?.blueprints ?? [], name] });
+		}
+	}
+
+	return fields;
+}
+
+/**
+ * The methods `$page`, `$site`, `$block` or `$this` (in a model) has in a file besides Kirby's own:
+ * those plugins and the config register, and for a page in a template or controller its model's
+ * @param {'page' | 'site' | 'block' | 'this'} variable
+ * @param {string} file
+ * @param {string} site
+ * @returns {{ name: string, params: string, returns?: string, description?: string, origin: string }[]}
+ */
+function methodsFor(variable, file, site) {
+	const [folder, ...rest] = path.relative(site, file).split(path.sep);
+
+	// $this is only clear in a model, where PHP itself knows the model's own methods
+	if (variable === 'this' && folder !== 'models') {
+		return [];
+	}
+
+	const kind = { page: 'pageMethods', this: 'pageMethods', site: 'siteMethods', block: 'blockMethods' }[variable];
+	const methods = [...entriesOf(site, kind)].map(([name, entry]) => {
+		const info = cached(`closure:${entry.file}:${entry.line}`, () => closureInfo(entry));
+		return { name, params: info?.params ?? '', returns: info?.returns, description: info?.description, origin: origin(entry, site) };
+	});
+
+	const template = rest.join('/').replace(/\..*$/, '');
+	const model = variable === 'page' && ['templates', 'controllers'].includes(folder) ? cached('models:' + site, () => listModels(site)).get(template) : undefined;
+
+	if (model !== undefined) {
+		const file = path.relative(path.dirname(site), model.file);
+		methods.push(...cached(`model:${model.file}`, () => classMethods(model.file, model.className)).map((method) => ({ ...method, origin: `model · ${file}` })));
+	}
+
+	return methods;
+}
+
+/**
+ * A completion item for a method
+ * @param {{ name: string, params: string, returns?: string, description?: string, origin?: string }} method
+ * @param {{ start: import('vscode-languageserver').Position, end: import('vscode-languageserver').Position }} range
+ * @param {boolean} call whether `(` already follows
+ * @param {string} sortText
+ */
+function methodItem(method, range, call, sortText) {
+	return {
+		label: method.name,
+		kind: CompletionItemKind.Method,
+		detail: `(${method.params})${method.returns === undefined ? '' : ': ' + method.returns}${method.origin === undefined ? '' : ' · ' + method.origin}`,
+		documentation: method.description,
+		filterText: method.name,
+		sortText,
+		textEdit: { range, newText: call ? method.name : method.name + '()' },
+	};
+}
+
+/**
+ * Completion after `$page->`, `$site->`, `$block->` or `$this->` (in a model): the fields
+ * from the blueprint of the page, site or block, inserted as `name()`, then the methods
+ * that plugins, the config or the page's model add
  * @param {TextDocument} document
  * @param {{ line: number, character: number }} position
  * @param {string} site
@@ -188,29 +264,51 @@ function fieldCompletion(document, position, site) {
 		return null;
 	}
 
-	const find = blueprintFinder(site);
-	const fields = new Map();
-
-	for (const name of blueprintsForVariable(context.variable, fileURLToPath(document.uri), site)) {
-		const blueprint = find(name);
-
-		for (const field of blueprint === null ? [] : cached(`fields:${site}:${name}`, () => blueprintFields(blueprint, find))) {
-			const known = fields.get(field.name);
-			fields.set(field.name, { ...field, blueprints: [...known?.blueprints ?? [], name] });
-		}
-	}
-
+	const file = fileURLToPath(document.uri);
 	const range = { start: document.positionAt(context.start), end: document.positionAt(context.end) };
 
-	return [...fields.values()].map((field, index) => ({
+	const fields = [...fieldsFor(context.variable, file, site).values()].map((field, index) => ({
 		label: field.name,
 		kind: CompletionItemKind.Field,
 		detail: `${field.type} · ${field.blueprints.join(', ')}`,
 		documentation: field.label === undefined ? undefined : field.label,
 		filterText: field.name,
-		sortText: String(index).padStart(3, '0'),
+		sortText: '0' + String(index).padStart(3, '0'),
 		textEdit: { range, newText: context.call ? field.name : field.name + '()' },
 	}));
+
+	return [...fields, ...methodsFor(context.variable, file, site).map((method) => methodItem(method, range, context.call, '1' + method.name))];
+}
+
+/**
+ * Completion after a field, `$page->cover()->`: Kirby's field methods (those that fit the
+ * field's type first, like `toFile()` for a `filepicker`) and those plugins and the config add.
+ * Only for fields of the blueprint; other calls are left to PHP's own language server.
+ * @param {TextDocument} document
+ * @param {{ line: number, character: number }} position
+ * @param {string} site
+ */
+function fieldMethodCompletion(document, position, site) {
+	const context = fieldMethodContext(document.getText(), document.offsetAt(position));
+	const field = context === null ? undefined : [...fieldsFor(context.variable, fileURLToPath(document.uri), site).values()].find(({ name }) => name.toLowerCase() === context.field.toLowerCase());
+
+	if (field === undefined) {
+		return null;
+	}
+
+	const range = { start: document.positionAt(context.start), end: document.positionAt(context.end) };
+	const fitting = fittingMethods(field.type);
+
+	// Plugin field methods get the field as their first parameter
+	const custom = [...entriesOf(site, 'fieldMethods')].map(([name, entry]) => {
+		const info = cached(`closure:${entry.file}:${entry.line}`, () => closureInfo(entry));
+		const params = (info?.params ?? '').split(',').slice(1).join(',').trim();
+		return methodItem({ name, params, returns: info?.returns, description: info?.description, origin: origin(entry, site) }, range, context.call, '1' + name);
+	});
+
+	const core = fieldMethods().map((method) => methodItem(method, range, context.call, fitting.includes(method.name) ? '0' + fitting.indexOf(method.name) : '2' + method.name));
+
+	return [...core, ...custom];
 }
 
 /**
@@ -462,9 +560,9 @@ function translationsOf(site) {
 }
 
 /**
- * The snippets, collections or translations of a site, by name
+ * The snippets, collections, translations, templates, blueprints or methods of a site, by name
  * @param {string} site
- * @param {import('./calls.js').Kind} kind
+ * @param {import('./calls.js').Kind | 'blueprint' | 'pageMethods' | 'siteMethods' | 'fieldMethods' | 'blockMethods'} kind
  * @returns {Map<string, any>}
  */
 function entriesOf(site, kind) {
@@ -478,6 +576,10 @@ function entriesOf(site, kind) {
 
 	if (kind === 'blueprint') {
 		return blueprintsOf(site).blueprints;
+	}
+
+	if (kind.endsWith('Methods') === true) {
+		return cached(kind + ':' + site, () => listMethods(site, kind));
 	}
 
 	// Page and file templates; for pages the template file wins (it's what PHP code is about)
@@ -787,7 +889,7 @@ connection.onCompletion(({ textDocument, position }) => {
 		}
 	}
 
-	const fields = site ? fieldCompletion(document, position, site) : null;
+	const fields = site ? fieldMethodCompletion(document, position, site) ?? fieldCompletion(document, position, site) : null;
 
 	if (fields !== null) {
 		return fields;

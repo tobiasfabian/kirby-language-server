@@ -306,3 +306,24 @@ export function fieldContext(text, offset) {
 
 	return { variable: /** @type {any} */ (match[1]), prefix: match[2], start: offset - match[2].length, end, call: text[end] === '(' };
 }
+
+/**
+ * If the cursor is after a field call, `$page->cover()->`, returns the variable,
+ * the field, the part of the method typed so far, where the name starts and ends,
+ * and whether `(` follows it
+ * @param {string} text
+ * @param {number} offset
+ * @returns {{ variable: 'page' | 'site' | 'block' | 'this', field: string, prefix: string, start: number, end: number, call: boolean } | null}
+ */
+export function fieldMethodContext(text, offset) {
+	const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
+	const match = text.slice(lineStart, offset).match(/\$(page|site|block|this)\s*->\s*(\w+)\(\s*\)\s*->\s*(\w*)$/);
+
+	if (match === null) {
+		return null;
+	}
+
+	const end = offset + text.slice(offset).match(/^\w*/)[0].length;
+
+	return { variable: /** @type {any} */ (match[1]), field: match[2], prefix: match[3], start: offset - match[3].length, end, call: text[end] === '(' };
+}

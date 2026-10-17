@@ -1,0 +1,383 @@
+{
+	"kirby": "6.0.0-beta.1",
+	"methods": [
+		{
+			"name": "callback",
+			"params": "Closure $callback",
+			"returns": "mixed",
+			"description": "Applies the callback function to the field"
+		},
+		{
+			"name": "escape",
+			"params": "string $context = 'html'",
+			"returns": "static",
+			"description": "Escapes the field value to be safely used in HTML templates without the risk of XSS attacks"
+		},
+		{
+			"name": "excerpt",
+			"params": "int $chars = 0, bool $strip = true, string $rep = ' …'",
+			"returns": "static",
+			"description": "Creates an excerpt of the field value without html or any other formatting."
+		},
+		{
+			"name": "html",
+			"params": "",
+			"returns": "static",
+			"description": "Converts the field content to valid HTML"
+		},
+		{
+			"name": "inline",
+			"params": "",
+			"returns": "static",
+			"description": "Strips all block-level HTML elements from the field value, it can be safely placed inside of other inline elements without the risk of breaking the HTML structure."
+		},
+		{
+			"name": "isEmpty",
+			"params": "",
+			"returns": "bool",
+			"description": "Checks if the field content is empty"
+		},
+		{
+			"name": "isFalse",
+			"params": "",
+			"returns": "bool",
+			"description": "Checks if the field value is falsely"
+		},
+		{
+			"name": "isNotEmpty",
+			"params": "",
+			"returns": "bool",
+			"description": "Checks if the field content is not empty"
+		},
+		{
+			"name": "isTrue",
+			"params": "",
+			"returns": "bool",
+			"description": "Checks if the field value is truthy"
+		},
+		{
+			"name": "isValid",
+			"params": "string $validator, ...$arguments",
+			"returns": "bool",
+			"description": "Validates the field content with the given validator and parameters"
+		},
+		{
+			"name": "kirbytags",
+			"params": "",
+			"returns": "static",
+			"description": "Parses all KirbyTags without also parsing Markdown"
+		},
+		{
+			"name": "kirbytext",
+			"params": "array $options = []",
+			"returns": "static",
+			"description": "Converts the field content from Markdown/Kirbytext to valid HTML"
+		},
+		{
+			"name": "kirbytextInline",
+			"params": "array $options = []",
+			"returns": "static",
+			"description": "Converts the field content from inline Markdown/Kirbytext to valid HTML"
+		},
+		{
+			"name": "length",
+			"params": "",
+			"returns": "int",
+			"description": "Returns the length of the field content"
+		},
+		{
+			"name": "lower",
+			"params": "",
+			"returns": "static",
+			"description": "Converts the field content to lowercase"
+		},
+		{
+			"name": "markdown",
+			"params": "array $options = []",
+			"returns": "static",
+			"description": "Converts markdown to valid HTML"
+		},
+		{
+			"name": "nl2br",
+			"params": "",
+			"returns": "static",
+			"description": "Converts all line breaks in the field content to `<br>` tags."
+		},
+		{
+			"name": "or",
+			"params": "mixed $fallback = null",
+			"returns": "static",
+			"description": "Provides a fallback if the field value is empty"
+		},
+		{
+			"name": "permalinksToUrls",
+			"params": "",
+			"returns": "static",
+			"description": "Parses the field value as DOM and replaces any permalinks in href/src attributes with the regular url This method is still experimental! You can use it to solve potential problems with permalinks already, but it might change in the future."
+		},
+		{
+			"name": "query",
+			"params": "string|null $expect = null",
+			"returns": "mixed",
+			"description": "Uses the field value as Kirby query"
+		},
+		{
+			"name": "replace",
+			"params": "array $data = [], string|null $fallback = ''",
+			"returns": "static",
+			"description": "It parses any queries found in the field value."
+		},
+		{
+			"name": "short",
+			"params": "int $length, string $appendix = '…'",
+			"returns": "static",
+			"description": "Cuts the string after the given length and adds \"…\" if it is longer"
+		},
+		{
+			"name": "slug",
+			"params": "",
+			"returns": "static",
+			"description": "Converts the field content to a slug"
+		},
+		{
+			"name": "smartypants",
+			"params": "",
+			"returns": "static",
+			"description": "Applies SmartyPants to the field"
+		},
+		{
+			"name": "split",
+			"params": "string $separator = ','",
+			"returns": "array",
+			"description": "Splits the field content into an array"
+		},
+		{
+			"name": "toBlocks",
+			"params": "",
+			"returns": "Blocks",
+			"description": "Converts a yaml or json field to a Blocks object"
+		},
+		{
+			"name": "toBool",
+			"params": "bool $default = false",
+			"returns": "bool",
+			"description": "Converts the field value into a proper boolean"
+		},
+		{
+			"name": "toData",
+			"params": "string $method = ','",
+			"returns": "array",
+			"description": "Parses the field value with the given method"
+		},
+		{
+			"name": "toDate",
+			"params": "string|IntlDateFormatter|null $format = null, string|null $fallback = null",
+			"returns": "string|int|null",
+			"description": "Converts the field value to a timestamp or a formatted date"
+		},
+		{
+			"name": "toEntries",
+			"params": "",
+			"returns": "Collection",
+			"description": "Parse yaml entries data and convert it to a collection of field objects"
+		},
+		{
+			"name": "toEnum",
+			"params": "string $enum",
+			"returns": "BackedEnum|null",
+			"description": "Converts the value to a case of the given enum $field->toEnum(MyEnum::class)"
+		},
+		{
+			"name": "toFile",
+			"params": "",
+			"returns": "File|null",
+			"description": "Returns a file object from a filename in the field"
+		},
+		{
+			"name": "toFiles",
+			"params": "string $separator = 'yaml'",
+			"returns": "Files",
+			"description": "Returns a file collection from a yaml list of filenames in the field"
+		},
+		{
+			"name": "toFloat",
+			"params": "float $default = 0",
+			"returns": "float",
+			"description": "Converts the field value into a proper float"
+		},
+		{
+			"name": "toInt",
+			"params": "int $default = 0",
+			"returns": "int",
+			"description": "Converts the field value into a proper integer"
+		},
+		{
+			"name": "toLayouts",
+			"params": "",
+			"returns": "Layouts",
+			"description": "Parse layouts and turn them into Layout objects"
+		},
+		{
+			"name": "toLink",
+			"params": "string|array|null $attr1 = null, array|null $attr2 = null",
+			"returns": "string",
+			"description": "Wraps a link tag around the field value. The field value is used as the link text"
+		},
+		{
+			"name": "toObject",
+			"params": "",
+			"returns": "Content",
+			"description": "Parse yaml data and convert it to a content object"
+		},
+		{
+			"name": "toPage",
+			"params": "",
+			"returns": "Page|null",
+			"description": "Returns a page object from a page id in the field"
+		},
+		{
+			"name": "toPages",
+			"params": "string $separator = 'yaml'",
+			"returns": "Pages",
+			"description": "Returns a pages collection from a yaml list of page ids in the field"
+		},
+		{
+			"name": "toQrCode",
+			"params": "",
+			"returns": "QrCode|null",
+			"description": "Turns the field value into an QR code object"
+		},
+		{
+			"name": "toStructure",
+			"params": "",
+			"returns": "Structure",
+			"description": "Converts a yaml field to a Structure object"
+		},
+		{
+			"name": "toTimestamp",
+			"params": "",
+			"returns": "int|false",
+			"description": "Converts the field value to a Unix timestamp"
+		},
+		{
+			"name": "toUrl",
+			"params": "",
+			"returns": "string|null",
+			"description": "Turns the field value into an absolute Url"
+		},
+		{
+			"name": "toUser",
+			"params": "",
+			"returns": "User|null",
+			"description": "Converts a user email address to a user object"
+		},
+		{
+			"name": "toUsers",
+			"params": "string $separator = 'yaml'",
+			"returns": "Users",
+			"description": "Returns a users collection from a yaml list of user email addresses in the field"
+		},
+		{
+			"name": "upper",
+			"params": "",
+			"returns": "static",
+			"description": "Converts the field content to uppercase"
+		},
+		{
+			"name": "widont",
+			"params": "",
+			"returns": "static",
+			"description": "Avoids typographical widows in strings by replacing the last space with `&nbsp;`"
+		},
+		{
+			"name": "words",
+			"params": "",
+			"returns": "int",
+			"description": "Returns the number of words in the text"
+		},
+		{
+			"name": "xml",
+			"params": "",
+			"returns": "static",
+			"description": "Converts the field content to valid XML"
+		},
+		{
+			"name": "yaml",
+			"params": "",
+			"returns": "array",
+			"description": "Parses yaml in the field content and returns an array"
+		},
+		{
+			"name": "bool",
+			"params": "bool $default = false",
+			"returns": "bool",
+			"description": "Alias of toBool()"
+		},
+		{
+			"name": "esc",
+			"params": "string $context = 'html'",
+			"returns": "static",
+			"description": "Alias of escape()"
+		},
+		{
+			"name": "float",
+			"params": "float $default = 0",
+			"returns": "float",
+			"description": "Alias of toFloat()"
+		},
+		{
+			"name": "h",
+			"params": "",
+			"returns": "static",
+			"description": "Alias of html()"
+		},
+		{
+			"name": "int",
+			"params": "int $default = 0",
+			"returns": "int",
+			"description": "Alias of toInt()"
+		},
+		{
+			"name": "kt",
+			"params": "array $options = []",
+			"returns": "static",
+			"description": "Alias of kirbytext()"
+		},
+		{
+			"name": "kti",
+			"params": "array $options = []",
+			"returns": "static",
+			"description": "Alias of kirbytextInline()"
+		},
+		{
+			"name": "link",
+			"params": "string|array|null $attr1 = null, array|null $attr2 = null",
+			"returns": "string",
+			"description": "Alias of toLink()"
+		},
+		{
+			"name": "md",
+			"params": "array $options = []",
+			"returns": "static",
+			"description": "Alias of markdown()"
+		},
+		{
+			"name": "sp",
+			"params": "",
+			"returns": "static",
+			"description": "Alias of smartypants()"
+		},
+		{
+			"name": "v",
+			"params": "string $validator, ...$arguments",
+			"returns": "bool",
+			"description": "Alias of isValid()"
+		},
+		{
+			"name": "x",
+			"params": "",
+			"returns": "static",
+			"description": "Alias of xml()"
+		}
+	]
+}

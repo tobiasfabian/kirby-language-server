@@ -1,11 +1,14 @@
 /**
- * Writes src/field-properties.json: the options of each Kirby 6 field type,
- * read from Kirby's source. The options of a field are the parameters of
- * its class's constructor and those of its parents; their descriptions
- * and defaults come from the properties of the same name (in the classes
- * or their mixins).
+ * Reads from Kirby 6's source what the server offers:
  *
- *   node scripts/field-properties.mjs path/to/kirby
+ * - src/field-properties.json: the options of each field type. The options of a
+ *   field are the parameters of its class's constructor and those of its parents;
+ *   their descriptions and defaults come from the properties of the same name
+ *   (in the classes or their mixins).
+ * - src/field-methods.json: the field methods (`toFile()`, `kirbytext()` …)
+ *   from the `FieldMethods` trait.
+ *
+ *   node scripts/read-kirby.mjs path/to/kirby
  */
 
 import fs from 'node:fs';
@@ -14,7 +17,7 @@ import path from 'node:path';
 const kirby = process.argv[2];
 
 if (kirby === undefined || fs.existsSync(path.join(kirby, 'src', 'Form', 'Field')) === false) {
-	console.error('Usage: node scripts/field-properties.mjs path/to/kirby (Kirby 6)');
+	console.error('Usage: node scripts/read-kirby.mjs path/to/kirby (Kirby 6)');
 	process.exit(1);
 }
 
@@ -175,11 +178,60 @@ const core = read(path.join(src, 'Cms', 'Core.php'));
 const body = core.slice(core.indexOf('function fields()'));
 const types = [...body.slice(0, body.indexOf('];')).matchAll(/'([\w-]+)'\s*=>\s*(\w+)::class/g)];
 
-const output = {
-	kirby: JSON.parse(read(path.join(kirby, 'composer.json'))).version,
-	fields: Object.fromEntries(types.map(([, type, name]) => [type, optionsOf(name)])),
-};
+const version = JSON.parse(read(path.join(kirby, 'composer.json'))).version;
 
-const target = new URL('../src/field-properties.json', import.meta.url);
-fs.writeFileSync(target, JSON.stringify(output, null, '\t') + '\n');
-console.log(`Wrote ${Object.keys(output.fields).length} field types of Kirby ${output.kirby} to src/field-properties.json`);
+/**
+ * Writes a JSON file to src/
+ * @param {string} name
+ * @param {any} data
+ */
+function write(name, data) {
+	fs.writeFileSync(new URL(`../src/${name}`, import.meta.url), JSON.stringify(data, null, '\t') + '\n');
+}
+
+const fields = Object.fromEntries(types.map(([, type, name]) => [type, optionsOf(name)]));
+write('field-properties.json', { kirby: version, fields });
+console.log(`Wrote ${Object.keys(fields).length} field types of Kirby ${version} to src/field-properties.json`);
+
+// Field methods: the public methods of the FieldMethods trait
+const trait = read(path.join(src, 'Content', 'FieldMethods.php'));
+const methods = [];
+
+for (const match of trait.matchAll(/(?:\/\*\*((?:(?!\*\/)[\s\S])*)\*\/\s*)?public\s+function\s+(\w+)\s*\(/g)) {
+	const open = match.index + match[0].length - 1;
+	let depth = 0;
+	let close = open;
+
+	for (let i = open, quote = null; i < trait.length; i++) {
+		const char = trait[i];
+
+		if (quote !== null) {
+			quote = char === '\\' ? (i++, quote) : char === quote ? null : quote;
+		} else if (char === '\'' || char === '"') {
+			quote = char;
+		} else if (char === '(' && ++depth) {
+			continue;
+		} else if (char === ')' && --depth === 0) {
+			close = i;
+			break;
+		}
+	}
+
+	const returns = trait.slice(close + 1).match(/^\s*:\s*([\w\\|?]+)/)?.[1];
+
+	// Aliases only say `@see self::toBool()`
+	const alias = match[1]?.match(/@see\s+self::(\w+)\(\)/)?.[1];
+	const text = alias === undefined ? (match[1] === undefined ? '' : description(match[1])) : `Alias of ${alias}()`;
+
+	if (match[2].startsWith('__') === false) {
+		methods.push({
+			name: match[2],
+			params: splitTopLevel(trait.slice(open + 1, close)).join(', '),
+			...(returns === undefined ? {} : { returns }),
+			...(text === '' ? {} : { description: text }),
+		});
+	}
+}
+
+write('field-methods.json', { kirby: version, methods });
+console.log(`Wrote ${methods.length} field methods of Kirby ${version} to src/field-methods.json`);

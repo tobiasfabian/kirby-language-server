@@ -6,10 +6,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
-import { arrayEntries, lineAt, pluginArray, returnedArray, stringsIn } from './php.js';
+import { arrayEntries, closingBracket, lineAt, pluginArray, returnedArray, stringsIn, withoutComments } from './php.js';
 
 const SKIP = new Set(['.git', 'node_modules', 'vendor', 'kirby', 'content', 'media', 'assets', 'cache', 'sessions', 'accounts', 'logs']);
 const SITE_FOLDERS = ['snippets', 'templates', 'blueprints'];
+
+// What plugins and the config register that the server reads
+const REGISTERED = /** @type {const} */ (['snippets', 'collections', 'templates', 'blueprints', 'controllers', 'pageMethods', 'siteMethods', 'fieldMethods', 'blockMethods', 'pageModels']);
+
+/** @typedef {typeof REGISTERED[number]} Registered */
 
 // Kirby 6's own block blueprints (in kirby/config/blocks)
 const KIRBY_BLOCKS = ['code', 'gallery', 'heading', 'image', 'line', 'list', 'markdown', 'quote', 'table', 'text', 'video'];
@@ -104,16 +109,16 @@ function phpFiles(folder, extension = '.php') {
 }
 
 /**
- * Reads the snippets, collections, templates and blueprints a plugin (`index.php`) or the config
- * (`config.php`, under `'extensions'`) registers. A list may also come from a file
- * (`'blueprints' => require __DIR__ . '/blueprints.php'`).
- * `complete` is false if the blueprints couldn't be read.
+ * Reads the snippets, collections, templates, blueprints, controllers, methods and page models
+ * a plugin (`index.php`) or the config (`config.php`, under `'extensions'`) registers.
+ * A list may also come from a file (`'blueprints' => require __DIR__ . '/blueprints.php'`).
+ * `value` is the code of each entry; `complete` is false if the blueprints couldn't be read.
  * @param {string} file
  * @param {'plugin' | 'config'} type
- * @returns {Record<'snippets' | 'collections' | 'templates' | 'blueprints', { name: string, file: string, line: number, inline?: boolean }[]> & { complete: boolean }}
+ * @returns {Record<Registered, { name: string, file: string, line: number, inline?: boolean, value: string }[]> & { complete: boolean }}
  */
 function registered(file, type) {
-	const result = { snippets: [], collections: [], templates: [], blueprints: [], complete: true };
+	const result = { ...Object.fromEntries(REGISTERED.map((kind) => [kind, []])), complete: true };
 	const code = read(file);
 
 	if (code === null) {
@@ -139,7 +144,7 @@ function registered(file, type) {
 		entries = arrayEntries(code, extensions.valueStart);
 	}
 
-	for (const kind of ['snippets', 'collections', 'templates', 'blueprints']) {
+	for (const kind of REGISTERED) {
 		const entry = entries.find(({ key }) => key === kind);
 
 		// Mentioned, but not where it was expected (e.g. in `array(…)` syntax)
@@ -163,8 +168,8 @@ function registered(file, type) {
 			const target = value.startsWith('[') ? null : value.match(kind === 'blueprints' ? /['"]([^'"]+\.(?:ya?ml|php|json))['"]/ : /['"]([^'"]+\.php)['"]/);
 
 			result[kind].push(target === null
-				? { name: item.key, file: list.file, line: lineAt(list.code, item.keyStart), inline: true }
-				: { name: item.key, file: path.join(path.dirname(list.file), target[1].replace(/^\//, '')), line: 0 });
+				? { name: item.key, file: list.file, line: lineAt(list.code, item.keyStart), inline: true, value }
+				: { name: item.key, file: path.join(path.dirname(list.file), target[1].replace(/^\//, '')), line: 0, value });
 		}
 	}
 
@@ -286,24 +291,82 @@ export function snippetProps(file) {
 }
 
 /**
+ * Reads a closure that a plugin or the config registers (a collection, a method …):
+ * its signature from `function`/`fn` up to the return type, e.g. `function (Site $site): Pages`,
+ * its parameters and return type, and the text of the docblock above it.
+ * For an entry in a file of its own (line 0), the closure the file returns.
+ * @param {Entry} entry
+ * @returns {{ signature: string, params: string, returns?: string, description?: string } | null}
+ */
+export function closureInfo(entry) {
+	const code = read(entry.file);
+
+	if (code === null) {
+		return null;
+	}
+
+	const lines = code.split('\n');
+	const start = entry.line > 0 ? entry.line : Math.max(0, lines.findIndex((line) => /\breturn\b/.test(line)));
+	const offset = lines.slice(0, start).join('\n').length + (start > 0 ? 1 : 0);
+	const keyword = lines.slice(start, start + 4).join('\n').match(/(?:static\s+)?(?:function|fn)\s*\(/);
+
+	if (keyword === null) {
+		return null;
+	}
+
+	// The parameters may span lines and have comments
+	const open = offset + keyword.index + keyword[0].length - 1;
+	const close = closingBracket(code, open);
+	const params = withoutComments(code.slice(open + 1, close)).replace(/\s+/g, ' ').replace(/,\s*$/, '').trim();
+	const returns = code.slice(close + 1).match(/^\s*(?:use\s*\([^)]*\)\s*)?:\s*([\w\\|?]+)/)?.[1];
+
+	return {
+		signature: `${keyword[0].slice(0, -1).trim()} (${params})${returns === undefined ? '' : ': ' + returns}`,
+		params,
+		returns,
+		description: docblockAbove(lines, start),
+	};
+}
+
+/**
+ * The text of the docblock right above a line, without stars and tags
+ * @param {string[]} lines
+ * @param {number} index
+ */
+function docblockAbove(lines, index) {
+	let end = index - 1;
+
+	while (end >= 0 && lines[end].trim() === '') {
+		end--;
+	}
+
+	if (end < 0 || lines[end].trim().endsWith('*/') === false) {
+		return undefined;
+	}
+
+	let start = end;
+
+	while (start > 0 && lines[start].trim().startsWith('/**') === false) {
+		start--;
+	}
+
+	const text = lines.slice(start, end + 1)
+		.map((line) => line.trim().replace(/^\/\*\*|\*\/$/g, '').replace(/^\*\s?/, '').trim())
+		.filter((line) => line !== '' && line.startsWith('@') === false)
+		.join(' ');
+
+	return text === '' ? undefined : text;
+}
+
+/**
  * Returns how a collection is defined: its closure's signature,
  * e.g. `return function (Site $site): Pages`
  * @param {Entry} collection
  * @returns {string | null}
  */
 export function collectionSignature(collection) {
-	const lines = collection.line > 0 ? head(collection.file).slice(collection.line, collection.line + 1) : head(collection.file);
-
-	for (const line of lines) {
-		// From `return` or `function`/`fn` up to the return type, without the body
-		const match = line.match(/(?:return\s+)?(?:static\s+)?(?:function|fn)\s*\([^)]*\)(?:\s*:\s*[\w\\|?]+)?/);
-
-		if (match !== null) {
-			return match[0];
-		}
-	}
-
-	return null;
+	const info = closureInfo(collection);
+	return info === null ? null : (collection.line > 0 ? '' : 'return ') + info.signature;
 }
 
 /**
@@ -760,4 +823,99 @@ export function listContentTemplates(site) {
 	}
 
 	return templates;
+}
+
+/**
+ * The page, site, field or block methods that plugins and the config register
+ * @param {string} site
+ * @param {'pageMethods' | 'siteMethods' | 'fieldMethods' | 'blockMethods'} kind
+ * @returns {Map<string, Entry>}
+ */
+export function listMethods(site, kind) {
+	const methods = new Map();
+
+	for (const plugin of plugins(site)) {
+		for (const { name, file, line, inline } of registered(path.join(site, 'plugins', plugin, 'index.php'), 'plugin')[kind]) {
+			methods.set(name, { file, line, inline, source: 'plugin', plugin });
+		}
+	}
+
+	for (const { name, file, line, inline } of registered(path.join(site, 'config', 'config.php'), 'config')[kind]) {
+		methods.set(name, { file, line, inline, source: 'config' });
+	}
+
+	return methods;
+}
+
+/**
+ * @typedef {object} Method
+ * @property {string} name
+ * @property {string} params
+ * @property {string} [returns]
+ * @property {string} [description]
+ * @property {number} line
+ */
+
+/**
+ * The public methods a class defines itself (not the inherited ones, and no magic methods)
+ * @param {string} file
+ * @param {string} [className] the class to read, if the file has more than one
+ * @returns {Method[]}
+ */
+export function classMethods(file, className) {
+	const code = read(file);
+
+	if (code === null) {
+		return [];
+	}
+
+	const classStart = className === undefined ? code.search(/\bclass\s+\w+/) : code.search(new RegExp(`\\bclass\\s+${className}\\b`));
+
+	if (classStart === -1) {
+		return [];
+	}
+
+	const open = code.indexOf('{', classStart);
+	const body = code.slice(0, closingBracket(code, open));
+	const lines = code.split('\n');
+	const methods = [];
+
+	for (const match of body.slice(open).matchAll(/\n[ \t]*(?:final\s+)?public\s+function\s+(\w+)\s*\(([^)]*)\)(?:\s*:\s*([\w\\|?]+))?/g)) {
+		const line = lineAt(code, open + match.index + 1);
+
+		if (match[1].startsWith('__') === false) {
+			methods.push({ name: match[1], params: match[2].replace(/\s+/g, ' ').trim(), returns: match[3], description: docblockAbove(lines, line), line });
+		}
+	}
+
+	return methods;
+}
+
+/**
+ * The page models of a site by template: `site/models/<template>.php`, and those
+ * plugins register (`'pageModels' => ['order' => OrderPage::class]`, the class looked up in the plugin's PHP files)
+ * @param {string} site
+ * @returns {Map<string, { file: string, className?: string }>}
+ */
+export function listModels(site) {
+	const models = new Map();
+
+	for (const plugin of plugins(site)) {
+		const folder = path.join(site, 'plugins', plugin);
+
+		for (const { name, value } of registered(path.join(folder, 'index.php'), 'plugin').pageModels) {
+			const className = value.match(/([\w]+)::class/)?.[1];
+			const file = className === undefined ? undefined : phpFiles(folder).map(({ file: candidate }) => candidate).find((candidate) => new RegExp(`\\bclass\\s+${className}\\b`).test(read(candidate) ?? ''));
+
+			if (file !== undefined) {
+				models.set(name, { file, className });
+			}
+		}
+	}
+
+	for (const { name, file } of phpFiles(path.join(site, 'models'))) {
+		models.set(name, { file });
+	}
+
+	return models;
 }

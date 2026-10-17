@@ -6,6 +6,7 @@
  */
 
 import { isMap, isPair, isScalar, isSeq, parseDocument, visit } from 'yaml';
+import methods from './field-methods.json' with { type: 'json' };
 import properties from './field-properties.json' with { type: 'json' };
 
 // Kirby 6 field types (pages, files and users are deprecated aliases)
@@ -618,4 +619,44 @@ export function blueprintFields(blueprint, find) {
 	walkLayout(extend(blueprint, find));
 
 	return [...fields.values()];
+}
+
+// The field methods that turn a field of a type into what it holds, offered first
+const FITTING_METHODS = {
+	blocks: ['toBlocks'],
+	checkboxes: ['split'],
+	date: ['toDate'],
+	entries: ['toEntries'],
+	filepicker: ['toFile', 'toFiles'],
+	layout: ['toLayouts'],
+	link: ['toUrl', 'toLink'],
+	multiselect: ['split'],
+	number: ['toInt', 'toFloat'],
+	object: ['toObject'],
+	pagepicker: ['toPage', 'toPages'],
+	range: ['toInt', 'toFloat'],
+	structure: ['toStructure'],
+	tags: ['split'],
+	textarea: ['kirbytext', 'kirbytextInline', 'excerpt'],
+	time: ['toDate'],
+	toggle: ['toBool', 'isTrue', 'isFalse'],
+	url: ['toUrl'],
+	userpicker: ['toUser', 'toUsers'],
+};
+
+/**
+ * Kirby 6's field methods (read from its source by scripts/read-kirby.mjs)
+ * @returns {{ name: string, params: string, returns?: string, description?: string }[]}
+ */
+export function fieldMethods() {
+	return methods.methods;
+}
+
+/**
+ * The field methods that fit a field type best, e.g. `toFile` and `toFiles` for a `filepicker`
+ * @param {string} type
+ * @returns {string[]}
+ */
+export function fittingMethods(type) {
+	return FITTING_METHODS[ALIASES[type] ?? type] ?? [];
 }

@@ -401,7 +401,7 @@ test('completes the fields of the page in a controller', async () => {
 	const { uri, position } = openPhp('controllers/project.php', fs.readFileSync(`${project}/public/site/controllers/project.php`, 'utf8'));
 	const items = await request('textDocument/completion', { textDocument: { uri }, position: position('$page->', 7) });
 
-	assert.deepEqual(items.map((item) => item.label), ['cover', 'gallery', 'intro', 'text', 'metaTitle', 'metaDescription']);
+	assert.deepEqual(items.filter((item) => item.kind === 5).map((item) => item.label), ['cover', 'gallery', 'intro', 'text', 'metaTitle', 'metaDescription']);
 	assert.equal(items[0].detail, 'filepicker · pages/project');
 	assert.equal(items[0].documentation, 'Titelbild');
 
@@ -413,7 +413,7 @@ test('completes the fields of the page in a controller', async () => {
 test('completes the fields of the site, a block and pages in a snippet', async () => {
 	const site = openPhp('templates/default.php', '<?= $site-> ?>');
 	const siteItems = await request('textDocument/completion', { textDocument: { uri: site.uri }, position: site.position('$site->', 7) });
-	assert.deepEqual(siteItems.map((item) => [item.label, item.textEdit.newText]), [['footer', 'footer()']]);
+	assert.deepEqual(siteItems.map((item) => [item.label, item.textEdit.newText]), [['footer', 'footer()'], ['contactPage', 'contactPage()']]);
 
 	const block = openPhp('snippets/blocks/text.php', '<?= $block->te ?>');
 	const blockItems = await request('textDocument/completion', { textDocument: { uri: block.uri }, position: block.position('$block->te', 10) });
@@ -452,4 +452,31 @@ test('completes true, false and null for an option', async () => {
 	const create = (await request('textDocument/completion', { textDocument: { uri }, position: at('create: ') })).map((item) => item.label);
 	assert.ok(create.includes('project'));
 	assert.deepEqual(create.slice(-3), ['true', 'false', 'null']);
+});
+
+test('completes methods of plugins and the page’s model', async () => {
+	const { uri, position } = openPhp('templates/project.php', '<?= $page-> ?>');
+	const items = await request('textDocument/completion', { textDocument: { uri }, position: position('$page->', 7) });
+	const contactForm = items.find((item) => item.label === 'contactForm');
+	const year = items.find((item) => item.label === 'year');
+
+	assert.equal(contactForm.detail, '(string $name = \'default\'): ?Page · plugin site-contact · site/plugins/site-contact/index.php');
+	assert.equal(contactForm.documentation, 'The contact form of the page');
+	assert.equal(year.detail, '(): int · model · site/models/project.php');
+	assert.equal(items.some((item) => item.label === 'secret'), false);
+	assert.ok(items.find((item) => item.label === 'cover').sortText < year.sortText);
+});
+
+test('completes field methods, the fitting ones first', async () => {
+	const { uri, position } = openPhp('templates/project.php', '<?= $page->cover()-> ?> <?= $page->children()-> ?>');
+	const items = await request('textDocument/completion', { textDocument: { uri }, position: position('cover()->', 9) });
+	const sorted = items.sort((a, b) => a.sortText.localeCompare(b.sortText)).map((item) => item.label);
+
+	assert.deepEqual(sorted.slice(0, 2), ['toFile', 'toFiles']);
+	assert.ok(sorted.includes('kirbytext'));
+	assert.equal(items.find((item) => item.label === 'toPhone').detail, '(string $format = \'international\'): string · plugin site-contact · site/plugins/site-contact/index.php');
+	assert.equal(items.find((item) => item.label === 'kt').documentation, 'Alias of kirbytext()');
+
+	// Not a field: left to PHP's language server
+	assert.deepEqual(await request('textDocument/completion', { textDocument: { uri }, position: position('children()->', 12) }), []);
 });

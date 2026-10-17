@@ -43,7 +43,7 @@ function skipToken(code, index) {
  * Removes PHP comments (line comments with `//` or `#`, and block comments) from a piece of code
  * @param {string} code
  */
-function withoutComments(code) {
+export function withoutComments(code) {
 	return code.replace(/\/\/[^\n]*|#(?!\[)[^\n]*|\/\*[\s\S]*?\*\//g, '');
 }
 
