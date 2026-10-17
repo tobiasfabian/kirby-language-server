@@ -5,10 +5,14 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { parse } from 'yaml';
 import { arrayEntries, lineAt, pluginArray, returnedArray, stringsIn } from './php.js';
 
 const SKIP = new Set(['.git', 'node_modules', 'vendor', 'kirby', 'content', 'media', 'assets', 'cache', 'sessions', 'accounts', 'logs']);
 const SITE_FOLDERS = ['snippets', 'templates', 'blueprints'];
+
+// Kirby 6's own block blueprints (in kirby/config/blocks)
+const KIRBY_BLOCKS = ['code', 'gallery', 'heading', 'image', 'line', 'list', 'markdown', 'quote', 'table', 'text', 'video'];
 
 /**
  * @typedef {object} Entry
@@ -16,6 +20,7 @@ const SITE_FOLDERS = ['snippets', 'templates', 'blueprints'];
  * @property {number} line 0-based line where it's defined
  * @property {'site' | 'plugin' | 'config' | 'kirby'} source
  * @property {string} [plugin] folder name of the plugin
+ * @property {boolean} [inline] defined in PHP code (a blueprint as an array or closure), not in a file of its own
  */
 
 /**
@@ -63,11 +68,12 @@ export function findSites(root, depth = 3) {
 }
 
 /**
- * Lists the PHP files below a folder, named by their path without `.php`
+ * Lists the PHP files (or others) below a folder, named by their path without the extension
  * @param {string} folder
+ * @param {string} extension
  * @returns {{ name: string, file: string }[]}
  */
-function phpFiles(folder) {
+function phpFiles(folder, extension = '.php') {
 	const files = [];
 
 	/** @param {string} current */
@@ -85,8 +91,8 @@ function phpFiles(folder) {
 
 			if (entry.isDirectory() === true) {
 				walk(file);
-			} else if (entry.name.endsWith('.php') === true) {
-				const name = path.relative(folder, file).slice(0, -4).split(path.sep).join('/');
+			} else if (entry.name.endsWith(extension) === true) {
+				const name = path.relative(folder, file).slice(0, -extension.length).split(path.sep).join('/');
 				files.push({ name, file });
 			}
 		}
@@ -98,25 +104,26 @@ function phpFiles(folder) {
 }
 
 /**
- * Reads the snippets and collections a plugin (`index.php`) or the config
- * (`config.php`, under `'extensions'`) registers
+ * Reads the snippets, collections and blueprints a plugin (`index.php`) or the config
+ * (`config.php`, under `'extensions'`) registers. A list may also come from a file
+ * (`'blueprints' => require __DIR__ . '/blueprints.php'`).
+ * `complete` is false if the blueprints couldn't be read.
  * @param {string} file
  * @param {'plugin' | 'config'} type
- * @returns {{ snippets: { name: string, file: string, line: number }[], collections: { name: string, file: string, line: number }[] }}
+ * @returns {Record<'snippets' | 'collections' | 'blueprints', { name: string, file: string, line: number, inline?: boolean }[]> & { complete: boolean }}
  */
 function registered(file, type) {
-	const result = { snippets: [], collections: [] };
-	let code;
+	const result = { snippets: [], collections: [], blueprints: [], complete: true };
+	const code = read(file);
 
-	try {
-		code = fs.readFileSync(file, 'utf8');
-	} catch {
+	if (code === null) {
 		return result;
 	}
 
 	const start = type === 'plugin' ? pluginArray(code) : returnedArray(code);
 
 	if (start === -1) {
+		result.complete = /['"]blueprints['"]\s*=>/.test(code) === false;
 		return result;
 	}
 
@@ -132,20 +139,32 @@ function registered(file, type) {
 		entries = arrayEntries(code, extensions.valueStart);
 	}
 
-	for (const kind of ['snippets', 'collections']) {
-		const list = entries.find((entry) => entry.key === kind);
+	for (const kind of ['snippets', 'collections', 'blueprints']) {
+		const entry = entries.find(({ key }) => key === kind);
 
-		if (list === undefined || code[list.valueStart] !== '[') {
+		// Mentioned, but not where it was expected (e.g. in `array(…)` syntax)
+		if (entry === undefined) {
+			result.complete &&= kind !== 'blueprints' || /['"]blueprints['"]\s*=>/.test(code) === false;
 			continue;
 		}
 
-		for (const item of arrayEntries(code, list.valueStart)) {
-			// A path to a file (`__DIR__ . '/x.php'`, `require 'x.php'`), or a closure defined right here
-			const target = code.slice(item.valueStart, item.valueEnd).match(/['"]([^'"]+\.php)['"]/);
+		const list = code[entry.valueStart] === '['
+			? { code, index: entry.valueStart, file }
+			: includedArray(code, entry.valueStart, entry.valueEnd, file);
+
+		if (list === null) {
+			result.complete &&= kind !== 'blueprints';
+			continue;
+		}
+
+		for (const item of arrayEntries(list.code, list.index)) {
+			// A path to a file (`__DIR__ . '/x.php'`, `require 'x.php'`), or something defined right here
+			const value = list.code.slice(item.valueStart, item.valueEnd);
+			const target = value.startsWith('[') ? null : value.match(kind === 'blueprints' ? /['"]([^'"]+\.(?:ya?ml|php|json))['"]/ : /['"]([^'"]+\.php)['"]/);
 
 			result[kind].push(target === null
-				? { name: item.key, file, line: lineAt(code, item.keyStart) }
-				: { name: item.key, file: path.join(path.dirname(file), target[1].replace(/^\//, '')), line: 0 });
+				? { name: item.key, file: list.file, line: lineAt(list.code, item.keyStart), inline: true }
+				: { name: item.key, file: path.join(path.dirname(list.file), target[1].replace(/^\//, '')), line: 0 });
 		}
 	}
 
@@ -595,6 +614,74 @@ export function findAsset(site, name) {
 
 	try {
 		return { file, directory: fs.statSync(file).isDirectory() };
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Lists the blueprints of a site in Kirby's lookup order: `site/blueprints` wins
+ * over the config and plugins, which win over Kirby's own (the block blueprints
+ * and the defaults `pages/default`, `files/default` and `site`).
+ * `complete` is false if a plugin's blueprints couldn't be read.
+ * @param {string} site
+ * @returns {{ blueprints: Map<string, Entry>, complete: boolean }}
+ */
+export function listBlueprints(site) {
+	const blueprints = new Map();
+	const kirby = path.join(path.dirname(site), 'kirby');
+	const core = path.join(kirby, 'src', 'Cms', 'Core.php');
+	const coreCode = read(core) ?? '';
+	let complete = true;
+
+	for (const block of KIRBY_BLOCKS) {
+		blueprints.set('blocks/' + block, { file: path.join(kirby, 'config', 'blocks', block, block + '.yml'), line: 0, source: 'kirby' });
+	}
+
+	for (const name of ['files/default', 'pages/default', 'site']) {
+		const index = coreCode.indexOf(`'${name}' =>`);
+		blueprints.set(name, { file: core, line: index === -1 ? 0 : lineAt(coreCode, index), source: 'kirby', inline: true });
+	}
+
+	for (const plugin of plugins(site)) {
+		const found = registered(path.join(site, 'plugins', plugin, 'index.php'), 'plugin');
+		complete &&= found.complete;
+
+		for (const { name, ...entry } of found.blueprints) {
+			blueprints.set(name, { ...entry, source: 'plugin', plugin });
+		}
+	}
+
+	const config = registered(path.join(site, 'config', 'config.php'), 'config');
+	complete &&= config.complete;
+
+	for (const { name, ...entry } of config.blueprints) {
+		blueprints.set(name, { ...entry, source: 'config' });
+	}
+
+	for (const { name, file } of phpFiles(path.join(site, 'blueprints'), '.yml')) {
+		blueprints.set(name, { file, line: 0, source: 'site' });
+	}
+
+	return { blueprints, complete };
+}
+
+/**
+ * The content of a blueprint file. Null for blueprints defined in PHP and for broken YAML.
+ * @param {Entry} entry
+ * @returns {Record<string, any> | null}
+ */
+export function readBlueprint(entry) {
+	const code = entry.inline === true || /\.ya?ml$/.test(entry.file) === false ? null : read(entry.file);
+
+	if (code === null) {
+		return null;
+	}
+
+	try {
+		// Like Kirby, a repeated key overrides the one before
+		const data = parse(code, { uniqueKeys: false, logLevel: 'silent' });
+		return data !== null && typeof data === 'object' && Array.isArray(data) === false ? data : null;
 	} catch {
 		return null;
 	}

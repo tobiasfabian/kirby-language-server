@@ -139,7 +139,7 @@ test('jumps to a collection defined in a plugin', async () => {
 
 	const [link] = location;
 	assert.equal(fileURLToPath(link.targetUri), `${project}/public/site/plugins/site-contact/index.php`);
-	assert.equal(link.targetSelectionRange.start.line, 10);
+	assert.equal(link.targetSelectionRange.start.line, 16);
 });
 
 test('shows the origin above each call', async () => {

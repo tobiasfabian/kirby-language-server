@@ -1,5 +1,5 @@
 /**
- * Reading positions in blueprints, and completion for `type:`.
+ * Reading positions in blueprints, completion for `type:`, and `extends`.
  *
  * The server is built for Kirby 6, where sections became fields
  * (https://getkirby.com/releases/6/blueprints).
@@ -113,4 +113,63 @@ export function fieldTypes() {
 		...FIELD_TYPES.map((name) => ({ name, docs: docs(name) })),
 		...Object.entries(ALIASES).map(([name, replacement]) => ({ name, replacement, docs: docs(replacement) })),
 	];
+}
+
+/**
+ * Whether a value is a YAML map (not a list)
+ * @param {any} value
+ * @returns {value is Record<string, any>}
+ */
+function isMap(value) {
+	return value !== null && typeof value === 'object' && Array.isArray(value) === false;
+}
+
+/**
+ * Merges two maps like Kirby's `A::merge($base, $props, A::MERGE_REPLACE)`:
+ * maps are merged key by key, lists are replaced
+ * @param {Record<string, any>} base
+ * @param {Record<string, any>} props
+ */
+function merge(base, props) {
+	const merged = { ...base };
+
+	for (const [key, value] of Object.entries(props)) {
+		merged[key] = isMap(value) && isMap(base[key]) ? merge(base[key], value) : value;
+	}
+
+	return merged;
+}
+
+/**
+ * Merges what a blueprint, tab or field extends into it, like Kirby's
+ * `Blueprint::extend()`. A string is a shorthand for `extends: …`.
+ * Blueprints that can't be found or read are skipped.
+ * @param {any} props
+ * @param {(name: string) => Record<string, any> | null} find the content of a blueprint by name
+ * @param {Set<string>} [seen] names already followed, against loops
+ * @returns {any}
+ */
+export function extend(props, find, seen = new Set()) {
+	if (typeof props === 'string') {
+		props = { extends: props };
+	}
+
+	if (isMap(props) === false || props.extends === undefined) {
+		return props;
+	}
+
+	let extended = props;
+
+	for (const name of [props.extends].flat()) {
+		const mixin = typeof name === 'string' && seen.has(name) === false ? find(name) : null;
+
+		if (mixin !== null) {
+			extended = merge(extend(mixin, find, new Set([...seen, name])), extended);
+		}
+	}
+
+	const result = { ...extended };
+	delete result.extends;
+
+	return result;
 }

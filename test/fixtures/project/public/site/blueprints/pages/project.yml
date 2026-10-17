@@ -1,0 +1,10 @@
+title: Project
+
+tabs:
+  content:
+    fields:
+      cover:
+        extends: fields/cover
+        label: Titelbild
+      text: textarea
+  seo: tabs/seo

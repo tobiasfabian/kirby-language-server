@@ -4,7 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { collectionSignature, findAsset, findDocroot, findSites, listCollections, listDocroot, listSnippets, listTranslations, snippetProps, snippetVariables } from '../src/project.js';
+import { extend } from '../src/blueprints.js';
+import { collectionSignature, findAsset, findDocroot, findSites, listBlueprints, listCollections, listDocroot, listSnippets, listTranslations, readBlueprint, snippetProps, snippetVariables } from '../src/project.js';
 
 const project = fileURLToPath(new URL('./fixtures/project', import.meta.url));
 const site = path.join(project, 'public', 'site');
@@ -35,7 +36,7 @@ test('lists collections from the folder, plugins and the config', () => {
 	assert.deepEqual([...collections.keys()].sort(), ['blog/recent', 'contact-forms', 'projects', 'team']);
 	assert.equal(collections.get('projects')?.source, 'site');
 	assert.equal(collections.get('contact-forms')?.source, 'plugin');
-	assert.equal(collections.get('contact-forms')?.line, 10);
+	assert.equal(collections.get('contact-forms')?.line, 16);
 	assert.equal(collections.get('team')?.source, 'config');
 });
 
@@ -114,4 +115,49 @@ test('finds files in the docroot', () => {
 	assert.equal(findAsset(site, '/assets/css/index.css')?.directory, false);
 	assert.equal(findAsset(site, 'assets/css')?.directory, true);
 	assert.equal(findAsset(site, 'assets/css/missing.css'), null);
+});
+
+test('lists blueprints from the site, plugins, the config and Kirby', () => {
+	const { blueprints, complete } = listBlueprints(site);
+
+	assert.equal(complete, true);
+	assert.equal(blueprints.get('pages/project')?.source, 'site');
+	assert.equal(blueprints.get('pages/default')?.source, 'site');
+	assert.equal(blueprints.get('files/default')?.source, 'kirby');
+	assert.equal(blueprints.get('blocks/text')?.file, path.join(project, 'public/kirby/config/blocks/text/text.yml'));
+
+	const contact = blueprints.get('pages/contact');
+	assert.deepEqual([contact?.source, contact?.plugin, contact?.file], ['plugin', 'site-contact', path.join(site, 'plugins/site-contact/blueprints/pages/contact.yml')]);
+
+	const form = blueprints.get('fields/contact-form');
+	assert.deepEqual([form?.inline, form?.line], [true, 8]);
+});
+
+test('reads blueprint lists from included files and notices unreadable ones', (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kirby-'));
+	t.after(() => fs.rmSync(root, { recursive: true }));
+
+	const write = (file, code) => {
+		fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+		fs.writeFileSync(path.join(root, file), code);
+	};
+
+	write('site/plugins/listed/index.php', `<?php\nKirby::plugin('a/listed', [\n\t'blueprints' => require __DIR__ . '/blueprints.php',\n]);\n`);
+	write('site/plugins/listed/blueprints.php', `<?php\nreturn [\n\t'blocks/teaser' => __DIR__ . '/teaser.yml',\n];\n`);
+	assert.equal(listBlueprints(path.join(root, 'site')).blueprints.get('blocks/teaser')?.file, path.join(root, 'site/plugins/listed/teaser.yml'));
+	assert.equal(listBlueprints(path.join(root, 'site')).complete, true);
+
+	write('site/plugins/runtime/index.php', `<?php\nKirby::plugin('a/runtime', [\n\t'blueprints' => A::map(glob(__DIR__ . '/*.yml'), fn ($file) => $file),\n]);\n`);
+	assert.equal(listBlueprints(path.join(root, 'site')).complete, false);
+});
+
+test('reads blueprints and what they extend', () => {
+	const { blueprints } = listBlueprints(site);
+	const find = (name) => blueprints.has(name) ? readBlueprint(blueprints.get(name)) : null;
+	const projectBlueprint = find('pages/project');
+
+	assert.deepEqual(extend(projectBlueprint.tabs.content.fields.cover, find), { label: 'Titelbild', type: 'filepicker', multiple: false });
+	assert.deepEqual(extend(projectBlueprint.tabs.seo, find), { label: 'SEO', fields: { metaTitle: 'text', metaDescription: { type: 'textarea' } } });
+	assert.equal(find('fields/contact-form'), null);
+	assert.equal(find('blocks/text'), null);
 });

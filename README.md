@@ -18,7 +18,7 @@ For `snippet('…')`, `collection('…')` and `t('…')`/`tt('…')`/`tc('…')`
 
 In Nova, Jump to Definition is the command **Open Referenced File** (⌃⌥⌘O). While Nova's built-in PHP language server (Intelephense) is on, Nova asks only that server for hover and ⌘-click. Without it, hover works but ⌘-click still doesn't jump; code lenses never appear. The completion list shows the same information as the hover.
 
-The server reads the project's files; it doesn't start Kirby. It finds the `site` folder within three levels of the project root (`site/`, `public/site/` …).
+The server reads the project's files (blueprints with the [yaml](https://eemeli.org/yaml/) package); it doesn't start Kirby. It finds the `site` folder within three levels of the project root (`site/`, `public/site/` …).
 
 ## Use it in Nova
 
@@ -40,10 +40,10 @@ The extension needs Node.js 18 or newer. It looks for `node` through the login s
 
 ```
 src/
-├── blueprints.js positions in blueprints, field types for type:
+├── blueprints.js positions in blueprints, field types for type:, extends
 ├── calls.js      finds snippet(), collection(), t() calls and file paths
 ├── php.js        reads what plugins and the config register
-├── project.js    reads snippets, collections, translations and the docroot from the project
+├── project.js    reads snippets, collections, translations, blueprints and the docroot
 └── server.js     the language server
 Kirby.novaextension/
 ├── extension.json

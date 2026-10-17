@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { fieldTypes, typeContext } from '../src/blueprints.js';
+import { extend, fieldTypes, typeContext } from '../src/blueprints.js';
 
 /**
  * Puts the cursor at `▮`
@@ -52,4 +52,19 @@ test('offers Kirby 6 field types with deprecated aliases', () => {
 	assert.equal(types.some(({ name }) => name === 'fields'), false);
 	assert.equal(types.find(({ name }) => name === 'pages')?.replacement, 'pagepicker');
 	assert.equal(types.find(({ name }) => name === 'text')?.docs, 'https://getkirby.com/docs/reference/panel/fields/text');
+});
+
+test('extends like Kirby: maps are merged, lists replaced', () => {
+	const blueprints = {
+		'fields/base': { type: 'text', label: 'Base', options: ['a', 'b'], props: { a: 1, b: 2 } },
+		'fields/more': { extends: 'fields/base', help: 'More' },
+		'fields/loop': { extends: 'fields/loop', label: 'Loop' },
+	};
+	const find = (name) => blueprints[name] ?? null;
+
+	assert.deepEqual(extend({ extends: 'fields/more', label: 'Own', options: ['c'], props: { b: 3 } }, find), { type: 'text', label: 'Own', options: ['c'], props: { a: 1, b: 3 }, help: 'More' });
+	assert.deepEqual(extend('fields/base', find), blueprints['fields/base']);
+	assert.deepEqual(extend({ extends: ['fields/base', 'fields/missing'], width: '1/2' }, find), { ...blueprints['fields/base'], width: '1/2' });
+	assert.deepEqual(extend('fields/loop', find), { label: 'Loop' });
+	assert.equal(extend(true, find), true);
 });
