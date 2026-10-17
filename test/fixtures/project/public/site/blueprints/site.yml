@@ -1,0 +1,6 @@
+title: Site
+
+fields:
+  footer:
+    type: textarea
+    label: Footer

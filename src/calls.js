@@ -285,3 +285,24 @@ export function propsContext(text, offset) {
 
 	return result;
 }
+
+/**
+ * If the cursor is after `$page->`, `$site->`, `$block->` or `$this->`, returns
+ * the variable, the part of the name typed so far, where the name starts and ends
+ * (the rest of a name after the cursor included), and whether `(` follows it
+ * @param {string} text
+ * @param {number} offset
+ * @returns {{ variable: 'page' | 'site' | 'block' | 'this', prefix: string, start: number, end: number, call: boolean } | null}
+ */
+export function fieldContext(text, offset) {
+	const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
+	const match = text.slice(lineStart, offset).match(/\$(page|site|block|this)\s*->\s*(\w*)$/);
+
+	if (match === null) {
+		return null;
+	}
+
+	const end = offset + text.slice(offset).match(/^\w*/)[0].length;
+
+	return { variable: /** @type {any} */ (match[1]), prefix: match[2], start: offset - match[2].length, end, call: text[end] === '(' };
+}

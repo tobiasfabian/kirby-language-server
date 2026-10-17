@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { blueprintReferences, extend, extendsContext, fieldProperties, fieldTypes, propertyContext, referenceAt, templateSlots, typeContext } from '../src/blueprints.js';
+import { blueprintFields, blueprintReferences, extend, extendsContext, fieldProperties, fieldTypes, propertyContext, referenceAt, templateSlots, typeContext } from '../src/blueprints.js';
 
 /**
  * Puts the cursor at `▮`
@@ -196,4 +196,29 @@ test('detects where a key of a field goes', () => {
 	assert.equal(at('tabs:\n  seo:\n    ▮'), null);
 	assert.equal(at('sections:\n  fields:\n    type: fields\n    ▮'), null);
 	assert.equal(at('fields:\n  title:\n    label: ▮'), null);
+});
+
+test('collects the fields of a blueprint that store content', () => {
+	const parts = {
+		'fields/cover': { type: 'filepicker', label: { en: 'Cover', de: 'Titelbild' } },
+		'tabs/seo': { fields: { metaTitle: { type: 'text' } } },
+		'fields/address': { type: 'group', fields: { street: { type: 'text' } } },
+	};
+	const fields = blueprintFields({
+		fields: { intro: { type: 'textarea' }, list: { type: 'pagelist' } },
+		tabs: {
+			content: { columns: [{ fields: ['intro', { name: 'note', type: 'text' }] }, { fields: { cover: { extends: 'fields/cover' }, address: 'fields/address', hint: { type: 'info' } } }] },
+			seo: 'tabs/seo',
+		},
+		sections: { legacy: { type: 'fields', fields: { old: { type: 'text' } } }, drafts: { type: 'pages' } },
+	}, (name) => parts[name] ?? null);
+
+	assert.deepEqual(fields, [
+		{ name: 'intro', type: 'textarea', label: undefined },
+		{ name: 'note', type: 'text', label: undefined },
+		{ name: 'cover', type: 'filepicker', label: 'Cover' },
+		{ name: 'street', type: 'text', label: undefined },
+		{ name: 'metaTitle', type: 'text', label: undefined },
+		{ name: 'old', type: 'text', label: undefined },
+	]);
 });

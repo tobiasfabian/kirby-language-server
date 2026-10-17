@@ -2,26 +2,31 @@
 
 ## What it does
 
-When you type `snippet('`, `collection('` or `t('` (also `tt('`, `tc('`) in a PHP file, or `kirby.collection("` in a blueprint query:
+In PHP files:
 
-- **Completion** lists every snippet, collection or translation key of the project, with where it comes from:
+- **Snippets, collections and translations**: `snippet('`, `collection('` and `t('` (also `tt('`, `tc('`, and `kirby.collection("` in blueprint queries) list every snippet, collection or translation key of the project, with where it comes from:
 	- snippets from `site/snippets`, registered by plugins or in the config, and Kirby's block snippets; each shows the variables it expects (`@var` lines and defaults like `$size ??= null;`)
 	- collections from `site/collections`, registered by plugins or under `'extensions'` in the config; each shows its signature
 	- translation keys from `site/languages`, plugins and the config, then Kirby's own (from `kirby/i18n/translations`); each shows its text in the default language, and in all languages in the details
 - **Snippet variables**: inside `snippet('m-card', ['…`, the keys of the data array are completed with the variables the snippet expects, their type and default.
-- **Open Referenced File** (⌃⌥⌘O, or from the command palette) opens the file the name under the cursor refers to, for translation keys the line in the language file.
-- **Warnings** mark calls whose snippet, collection or translation key doesn't exist. `t('key', 'Fallback')` with a fallback text isn't flagged. If a plugin loads its translations at runtime (e.g. from JSON files), missing keys are only a hint, because they might come from there.
-
-File paths in `hashedUrl('`, `asset('`, `svg('`, `css('`, `js('` and `url('assets/` are completed with the files and folders of the docroot (where Kirby's `index.php` is), and marked if the file doesn't exist. ⌃⌥⌘O opens the file. URLs, `@auto` and files in `media/` (which Kirby creates on demand) aren't checked.
+- **File paths** in `hashedUrl('`, `asset('`, `svg('`, `css('`, `js('` and `url('assets/`: the files and folders of the docroot (where Kirby's `index.php` is). URLs, `@auto` and files in `media/` (which Kirby creates on demand) aren't checked.
+- **Templates** in `->template('…')`, `->notTemplate('…')`, `->changeTemplate('…')` and `filterBy('template', …)`.
+- **Field names**: after `$page->`, `$site->`, `$block->` and `$this->` (in a model), the fields of the page's, site's or block's blueprint are offered as `name()`, with their type and label. In a template, controller or model it's the blueprint of that template; in a block snippet that block's; in other snippets the fields of all page blueprints.
 
 In blueprints:
 
 - `type: ` offers Kirby 6's field types, such as `pagelist` and `pagepicker`. `pages`, `files` and `users` are shown as deprecated aliases.
 - At a key of a field, the options of its type are offered, with their type, default and description: `counter`, `maxlength` … for a `text` field, `templates`, `layout` … for a `pagelist`. Options the field already has are left out.
-- Template names in `template:`/`templates:`/`create:` of a `pagelist`, `template:` of a `filelist`, `uploads:` of a `filepicker` or `textarea` and `options: changeTemplate:` offer the page (or file) templates: from blueprints, `site/templates`, plugins, and the pages in the content folder. Templates that don't exist anywhere are marked; for file templates without a blueprint it's only a hint, because Kirby falls back to `files/default`.
-- `extends: ` and the shorthand `seo: fields/seo` (in `fields`, `tabs` and `sections`) offer the project's blueprints, those of the fitting folder first. Blueprints that don't exist are marked; `intro: textarea` too, because Kirby reads it as `extends` and not as the type. ⌃⌥⌘O opens the blueprint.
+- `extends: ` and the shorthand `seo: fields/seo` (in `fields`, `tabs` and `sections`) offer the project's blueprints, those of the fitting folder first.
+- Template names in `template:`/`templates:`/`create:` of a `pagelist`, `template:` of a `filelist`, `uploads:` of a `filepicker` or `textarea` and `options: changeTemplate:` offer the page (or file) templates: from blueprints, `site/templates`, plugins, and the pages in the content folder.
 
-In PHP, `->template('…')`, `->notTemplate('…')`, `->changeTemplate('…')` and `filterBy('template', …)` complete and check template names the same way.
+For all of them:
+
+- **Open Referenced File** (⌃⌥⌘O, or from the command palette) opens the file the name under the cursor refers to: the snippet, collection, file, blueprint or template, for translation keys the line in the language file.
+- **Warnings** mark names that don't exist.
+	- `t('key', 'Fallback')` with a fallback text isn't flagged. If a plugin loads its translations at runtime (e.g. from JSON files), missing keys are only a hint, because they might come from there.
+	- `intro: textarea` is marked too, because Kirby reads it as `extends` and not as the type.
+	- A template exists if there's a blueprint, a template file or a page that uses it. For file templates without a blueprint it's only a hint, because Kirby falls back to `files/default`.
 
 Fallbacks such as `snippet(['m-card-project', 'm-card'])` are understood. Names built at runtime, like `snippet('blocks/' . $block->type())`, are not checked.
 

@@ -378,3 +378,53 @@ test('completes the options of a field', async () => {
 	assert.equal(items.find((item) => item.label === 'multiple').detail, 'bool|null = true');
 	assert.equal(items.find((item) => item.label === 'multiple').textEdit.newText, 'multiple: ');
 });
+
+/**
+ * Opens a PHP file of the fixture site with the given text
+ * @param {string} file relative to site/
+ * @param {string} text
+ */
+function openPhp(file, text) {
+	const uri = pathToFileURL(`${project}/public/site/${file}`).href;
+
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'php', version: 1, text } } });
+
+	const position = (needle, shift = 0) => {
+		const lines = text.slice(0, text.indexOf(needle) + shift).split('\n');
+		return { line: lines.length - 1, character: lines.at(-1).length };
+	};
+
+	return { uri, position };
+}
+
+test('completes the fields of the page in a controller', async () => {
+	const { uri, position } = openPhp('controllers/project.php', fs.readFileSync(`${project}/public/site/controllers/project.php`, 'utf8'));
+	const items = await request('textDocument/completion', { textDocument: { uri }, position: position('$page->', 7) });
+
+	assert.deepEqual(items.map((item) => item.label), ['cover', 'gallery', 'intro', 'text', 'metaTitle', 'metaDescription']);
+	assert.equal(items[0].detail, 'filepicker · pages/project');
+	assert.equal(items[0].documentation, 'Titelbild');
+
+	// The rest of the name after the cursor is replaced, the existing parentheses kept
+	assert.equal(items[0].textEdit.newText, 'cover');
+	assert.deepEqual(items[0].textEdit.range.end, position('$page->cover', 12));
+});
+
+test('completes the fields of the site, a block and pages in a snippet', async () => {
+	const site = openPhp('templates/default.php', '<?= $site-> ?>');
+	const siteItems = await request('textDocument/completion', { textDocument: { uri: site.uri }, position: site.position('$site->', 7) });
+	assert.deepEqual(siteItems.map((item) => [item.label, item.textEdit.newText]), [['footer', 'footer()']]);
+
+	const block = openPhp('snippets/blocks/text.php', '<?= $block->te ?>');
+	const blockItems = await request('textDocument/completion', { textDocument: { uri: block.uri }, position: block.position('$block->te', 10) });
+	assert.deepEqual(blockItems.map((item) => [item.label, item.detail]), [['text', 'writer · blocks/text']]);
+
+	const snippet = openPhp('snippets/m-card.php', '<?= $page-> ?>');
+	const labels = (await request('textDocument/completion', { textDocument: { uri: snippet.uri }, position: snippet.position('$page->', 7) })).map((item) => item.label);
+	assert.ok(labels.includes('related'));
+	assert.ok(labels.includes('cover'));
+	assert.equal(labels.includes('drafts'), false);
+
+	const other = openPhp('snippets/m-card.php', '<?= $this-> ?>');
+	assert.deepEqual(await request('textDocument/completion', { textDocument: { uri: other.uri }, position: other.position('$this->', 7) }), []);
+});

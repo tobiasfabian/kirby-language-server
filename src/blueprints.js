@@ -506,3 +506,76 @@ export function propertyContext(text, offset) {
 		present: own.map((line) => line.match(/^([\w-]+)\s*:/)?.[1]).filter((key) => key !== undefined),
 	};
 }
+
+// Fields that show something but store no content, so `$page->name()` has nothing to return
+const DISPLAY_TYPES = new Set(['buttons', 'filelist', 'gap', 'headline', 'info', 'line', 'pagelist', 'stats']);
+
+/**
+ * @typedef {object} BlueprintField
+ * @property {string} name
+ * @property {string} type
+ * @property {string} [label]
+ */
+
+/**
+ * The fields of a blueprint that store content: those defined at the top, in tabs,
+ * columns and `fields` sections, with `extends` followed and groups unwrapped.
+ * Lists, info and other fields that store nothing are left out.
+ * @param {Record<string, any>} blueprint
+ * @param {(name: string) => Record<string, any> | null} find the content of a blueprint by name, for `extends`
+ * @returns {BlueprintField[]}
+ */
+export function blueprintFields(blueprint, find) {
+	const fields = new Map();
+
+	const label = (value) => typeof value === 'string' ? value : isObject(value) ? Object.values(value).find((text) => typeof text === 'string') : undefined;
+
+	const add = (name, props) => {
+		const type = typeof props.type === 'string' ? props.type : name;
+
+		if (type === 'group') {
+			walkFields(props.fields);
+		} else if (DISPLAY_TYPES.has(ALIASES[type] ?? type) === false && fields.has(name) === false) {
+			fields.set(name, { name, type, label: label(props.label) });
+		}
+	};
+
+	// A map of fields, or a list (names of fields defined at the top, or props with a name)
+	function walkFields(list) {
+		if (Array.isArray(list) === true) {
+			list.filter((item) => isObject(item) && typeof item.name === 'string').forEach((item) => add(item.name, extend(item, find)));
+			return;
+		}
+
+		for (const [name, props] of Object.entries(isObject(list) ? list : {})) {
+			const field = props === true || props === null ? {} : extend(props, find);
+
+			if (isObject(field) === true) {
+				add(name, field);
+			}
+		}
+	}
+
+	// Tabs, columns and sections, which hold fields
+	function walkLayout(node) {
+		if (isObject(node) === false) {
+			return;
+		}
+
+		walkFields(node.fields);
+		Object.values(isObject(node.tabs) ? node.tabs : {}).forEach((tab) => walkLayout(extend(tab, find)));
+		Object.values(node.columns ?? {}).forEach((column) => walkLayout(column));
+
+		for (const [name, section] of Object.entries(isObject(node.sections) ? node.sections : {})) {
+			const props = extend(section === true ? {} : section, find);
+
+			if (isObject(props) === true && (props.type ?? name) === 'fields') {
+				walkFields(props.fields);
+			}
+		}
+	}
+
+	walkLayout(extend(blueprint, find));
+
+	return [...fields.values()];
+}

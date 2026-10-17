@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { completionContext, findCalls, nameAt, propsContext } from '../src/calls.js';
+import { completionContext, fieldContext, findCalls, nameAt, propsContext } from '../src/calls.js';
 
 const names = (text) => findCalls(text).map((call) => [call.kind, ...call.names.map(({ name }) => name)]);
 
@@ -127,4 +127,12 @@ test('finds the keys of a snippet’s data array', () => {
 	assert.equal(at(`<?php snippet('m-card', ['attr' => ['▮`), null);
 	assert.equal(at(`<?php snippet('m-card', ['a' => 1]); echo('▮`), null);
 	assert.equal(at(`<?php snippet('m-card', compact('▮`), null);
+});
+
+test('detects field names after $page->', () => {
+	assert.deepEqual(fieldContext('<?= $page->ti', 13), { variable: 'page', prefix: 'ti', start: 11, end: 13, call: false });
+	assert.deepEqual(fieldContext('<?= $page->ti() ?>', 13), { variable: 'page', prefix: 'ti', start: 11, end: 13, call: true });
+	assert.deepEqual(fieldContext('<?= $site->co|ver() ?>'.replace('|', ''), 13), { variable: 'site', prefix: 'co', start: 11, end: 16, call: true });
+	assert.equal(fieldContext('<?= $page->children()->', 23), null);
+	assert.equal(fieldContext('<?= $item->', 11), null);
 });

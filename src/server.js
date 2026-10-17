@@ -11,8 +11,8 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { blueprintReferences, extend, extendsContext, fieldProperties, fieldTypes, isFieldType, propertyContext, referenceAt, templateSlots, typeContext } from './blueprints.js';
-import { completionContext, findCalls, nameAt, propsContext } from './calls.js';
+import { blueprintFields, blueprintReferences, extend, extendsContext, fieldProperties, fieldTypes, isFieldType, propertyContext, referenceAt, templateSlots, typeContext } from './blueprints.js';
+import { completionContext, fieldContext, findCalls, nameAt, propsContext } from './calls.js';
 import { collectionSignature, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listDocroot, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
 
 const connection = createConnection(ProposedFeatures.all);
@@ -140,6 +140,77 @@ function assetCompletion(document, position, site, context) {
 function assetEntry(site, name) {
 	const asset = findAsset(site, name);
 	return asset === null || asset.directory === true ? undefined : { file: asset.file, line: 0, source: 'site' };
+}
+
+/**
+ * The blueprints whose fields `$page`, `$site`, `$block` or `$this` has in a file:
+ * `pages/<template>` in a template, controller or model (`pages/default` if there's no
+ * blueprint of its own), `blocks/<type>` in a block snippet, `site` for `$site`.
+ * Where it's not clear, e.g. `$page` in a snippet, all page (or block) blueprints.
+ * @param {'page' | 'site' | 'block' | 'this'} variable
+ * @param {string} file
+ * @param {string} site
+ * @returns {string[]}
+ */
+function blueprintsForVariable(variable, file, site) {
+	if (variable === 'site') {
+		return ['site'];
+	}
+
+	const blueprints = entriesOf(site, 'blueprint');
+	const [folder, ...rest] = path.relative(site, file).split(path.sep);
+	const name = rest.join('/').replace(/\..*$/, '');
+	const all = (prefix) => [...blueprints.keys()].filter((blueprint) => blueprint.startsWith(prefix) && blueprint.slice(prefix.length).includes('/') === false);
+
+	if (variable === 'block') {
+		return folder === 'snippets' && name.startsWith('blocks/') ? [name] : all('blocks/');
+	}
+
+	if (['templates', 'controllers', 'models'].includes(folder) === true && name.includes('/') === false) {
+		return [blueprints.has('pages/' + name) ? 'pages/' + name : 'pages/default'];
+	}
+
+	// $this is only clear in a model
+	return variable === 'page' ? all('pages/') : [];
+}
+
+/**
+ * Completion for field names after `$page->`, `$site->`, `$block->` or `$this->` (in a model),
+ * from the blueprint of the page, site or block. Inserts `name()`.
+ * @param {TextDocument} document
+ * @param {{ line: number, character: number }} position
+ * @param {string} site
+ */
+function fieldCompletion(document, position, site) {
+	const context = fieldContext(document.getText(), document.offsetAt(position));
+
+	if (context === null) {
+		return null;
+	}
+
+	const find = blueprintFinder(site);
+	const fields = new Map();
+
+	for (const name of blueprintsForVariable(context.variable, fileURLToPath(document.uri), site)) {
+		const blueprint = find(name);
+
+		for (const field of blueprint === null ? [] : cached(`fields:${site}:${name}`, () => blueprintFields(blueprint, find))) {
+			const known = fields.get(field.name);
+			fields.set(field.name, { ...field, blueprints: [...known?.blueprints ?? [], name] });
+		}
+	}
+
+	const range = { start: document.positionAt(context.start), end: document.positionAt(context.end) };
+
+	return [...fields.values()].map((field, index) => ({
+		label: field.name,
+		kind: CompletionItemKind.Field,
+		detail: `${field.type} · ${field.blueprints.join(', ')}`,
+		documentation: field.label === undefined ? undefined : field.label,
+		filterText: field.name,
+		sortText: String(index).padStart(3, '0'),
+		textEdit: { range, newText: context.call ? field.name : field.name + '()' },
+	}));
 }
 
 /**
@@ -648,8 +719,8 @@ connection.onInitialize((params) => {
 	return {
 		capabilities: {
 			textDocumentSync: TextDocumentSyncKind.Incremental,
-			// A space for `type: ` in blueprints
-			completionProvider: { triggerCharacters: ['\'', '"', '/', ' '] },
+			// A space for `type: ` in blueprints, `>` for `$page->`
+			completionProvider: { triggerCharacters: ['\'', '"', '/', ' ', '>'] },
 			definitionProvider: true,
 			hoverProvider: true,
 			codeLensProvider: { resolveProvider: false },
@@ -671,6 +742,12 @@ connection.onCompletion(({ textDocument, position }) => {
 		if (items !== null) {
 			return items;
 		}
+	}
+
+	const fields = site ? fieldCompletion(document, position, site) : null;
+
+	if (fields !== null) {
+		return fields;
 	}
 
 	// Keys of the data array: snippet('m-card', ['▮
