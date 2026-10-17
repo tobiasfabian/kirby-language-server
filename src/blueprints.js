@@ -660,3 +660,150 @@ export function fieldMethods() {
 export function fittingMethods(type) {
 	return FITTING_METHODS[ALIASES[type] ?? type] ?? [];
 }
+
+/**
+ * @typedef {object} FieldReference
+ * @property {string} name
+ * @property {number} start
+ * @property {number} end
+ */
+
+/**
+ * Finds the references to fields defined at the top of a blueprint: the names
+ * in a list of `fields` (Kirby 6, `fields: [intro, text]` in tabs and columns).
+ * Not those of `create: fields:`, which name the fields of the create dialog.
+ * @param {string} text
+ * @returns {FieldReference[]}
+ */
+export function fieldReferences(text) {
+	const document = parseDocument(text, { uniqueKeys: false, logLevel: 'silent' });
+	const references = [];
+	const isCreate = (node) => isPair(node) === true && isScalar(node.key) === true && node.key.value === 'create';
+
+	visit(document, {
+		Pair(_, pair, path) {
+			if (isScalar(pair.key) === true && pair.key.value === 'fields' && isSeq(pair.value) === true && path.some(isCreate) === false) {
+				for (const item of pair.value.items) {
+					if (isScalar(item) === true && typeof item.value === 'string' && item.range !== undefined) {
+						const start = item.range[0] + (item.type === 'QUOTE_DOUBLE' || item.type === 'QUOTE_SINGLE' ? 1 : 0);
+						references.push({ name: item.value, start, end: start + item.value.length });
+					}
+				}
+			}
+		},
+	});
+
+	return references;
+}
+
+/**
+ * The fields defined at the top of a blueprint that tabs, columns and sections can
+ * refer to, with the offset of their key (-1 if they come from a blueprint it extends).
+ * As in Kirby, only a blueprint with tabs, columns or sections defines fields this way.
+ * Null if that can't be known, because a blueprint it extends can't be read.
+ * @param {string} text
+ * @param {(name: string) => Record<string, any> | null} find
+ * @returns {Map<string, number> | null}
+ */
+export function fieldDefinitions(text, find) {
+	const document = parseDocument(text, { uniqueKeys: false, logLevel: 'silent' });
+	const root = document.toJSON();
+
+	if (isObject(root) === false) {
+		return new Map();
+	}
+
+	if ([root.extends ?? []].flat().some((name) => typeof name !== 'string' || find(name) === null) === true) {
+		return null;
+	}
+
+	const props = extend(root, find);
+	const definitions = new Map();
+
+	if (isObject(props.fields) === false || (props.tabs ?? props.columns ?? props.sections) === undefined) {
+		return definitions;
+	}
+
+	Object.keys(props.fields).forEach((name) => definitions.set(name, -1));
+
+	// The offsets of those defined right here
+	const fields = isMap(document.contents) === true ? document.contents.get('fields', true) : null;
+
+	for (const pair of isMap(fields) === true ? fields.items : []) {
+		if (isScalar(pair.key) === true && pair.key.range !== undefined && definitions.has(String(pair.key.value)) === true) {
+			definitions.set(String(pair.key.value), pair.key.range[0]);
+		}
+	}
+
+	return definitions;
+}
+
+/**
+ * @typedef {object} FieldsetReference
+ * @property {string} name what's written, e.g. `heading` or `blocks/quote`
+ * @property {string} blueprint the blueprint it refers to, e.g. `blocks/heading`
+ * @property {number} start
+ * @property {number} end
+ */
+
+/**
+ * Finds the block types the `fieldsets` of blocks and layout fields name: list items,
+ * keys with `true`, and strings, which extend a blueprint (`quote: blocks/quote`). Groups too.
+ * @param {string} text
+ * @returns {FieldsetReference[]}
+ */
+export function fieldsetReferences(text) {
+	const document = parseDocument(text, { uniqueKeys: false, logLevel: 'silent' });
+	const references = [];
+
+	const add = (node, blueprint) => {
+		if (isScalar(node) === true && typeof node.value === 'string' && node.value !== '' && node.range !== undefined) {
+			const start = node.range[0] + (node.type === 'QUOTE_DOUBLE' || node.type === 'QUOTE_SINGLE' ? 1 : 0);
+			references.push({ name: node.value, blueprint: blueprint(node.value), start, end: start + node.value.length });
+		}
+	};
+
+	visit(document, {
+		Pair(_, pair) {
+			if (isScalar(pair.key) === false || pair.key.value !== 'fieldsets') {
+				return;
+			}
+
+			if (isSeq(pair.value) === true) {
+				pair.value.items.forEach((item) => add(item, (name) => 'blocks/' + name));
+			}
+
+			// Groups are maps themselves; their `fieldsets` are visited on their own
+			for (const item of isMap(pair.value) === true ? pair.value.items : []) {
+				if (isScalar(item.value) === true && item.value.value === true) {
+					add(item.key, (name) => 'blocks/' + name);
+				} else if (isScalar(item.value) === true && typeof item.value.value === 'string') {
+					add(item.value, (name) => name);
+				}
+			}
+		},
+	});
+
+	return references;
+}
+
+/**
+ * If the cursor is in a list item of `fields` (`- int▮`), or in a list item or key of
+ * `fieldsets`, returns which of them, the part typed so far and where it starts
+ * @param {string} text
+ * @param {number} offset
+ * @returns {{ list: 'fields' | 'fieldsets', prefix: string, start: number } | null}
+ */
+export function listItemContext(text, offset) {
+	const { before, lines } = positionInfo(text, offset);
+	const match = before.match(/^(\s*)(-\s+)?([\w-]*)$/);
+
+	if (match === null || (match[2] === undefined && match[1] === '')) {
+		return null;
+	}
+
+	const parent = ancestors(lines, lines.length - 1, match[1].length)[0]?.key;
+	const list = match[2] === undefined ? (parent === 'fieldsets' ? 'fieldsets' : null) : ['fields', 'fieldsets'].includes(parent) ? parent : null;
+
+	return list === null ? null : { list, prefix: match[3], start: offset - match[3].length };
+}

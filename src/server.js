@@ -11,7 +11,7 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { blueprintFields, blueprintReferences, extend, extendsContext, fieldMethods, fieldProperties, fieldTypes, fittingMethods, isFieldType, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
+import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
 import { completionContext, fieldContext, fieldMethodContext, findCalls, nameAt, propsContext, variableAt, variableContext } from './calls.js';
 import { classMethods, closureInfo, collectionSignature, controllerVariables, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listControllers, listDocroot, listMethods, listModels, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
 import { undefinedVariables } from './variables.js';
@@ -267,8 +267,11 @@ function fieldCompletion(document, position, site) {
 
 	const file = fileURLToPath(document.uri);
 	const range = { start: document.positionAt(context.start), end: document.positionAt(context.end) };
+	const methods = methodsFor(context.variable, file, site);
 
-	const fields = [...fieldsFor(context.variable, file, site).values()].map((field, index) => ({
+	// A method of the same name wins over the field
+	const overridden = new Set(methods.map(({ name }) => name.toLowerCase()));
+	const fields = [...fieldsFor(context.variable, file, site).values()].filter(({ name }) => overridden.has(name.toLowerCase()) === false).map((field, index) => ({
 		label: field.name,
 		kind: CompletionItemKind.Field,
 		detail: `${field.type} · ${field.blueprints.join(', ')}`,
@@ -278,7 +281,7 @@ function fieldCompletion(document, position, site) {
 		textEdit: { range, newText: context.call ? field.name : field.name + '()' },
 	}));
 
-	return [...fields, ...methodsFor(context.variable, file, site).map((method) => methodItem(method, range, context.call, '1' + method.name))];
+	return [...fields, ...methods.map((method) => methodItem(method, range, context.call, '1' + method.name))];
 }
 
 /**
@@ -512,16 +515,101 @@ function extendsCompletion(document, position, site) {
 }
 
 /**
+ * The name of the blueprint a document is, e.g. `pages/project`
+ * @param {TextDocument} document
+ * @param {string} site
+ * @returns {string | null}
+ */
+function ownName(document, site) {
+	const file = fileURLToPath(document.uri);
+	return [...entriesOf(site, 'blueprint')].find(([, entry]) => entry.file === file)?.[0] ?? null;
+}
+
+/**
  * The folder of the blueprint a document is, e.g. `pages` for `pages/project.yml`
  * @param {TextDocument} document
  * @param {string} site
  * @returns {string | null}
  */
 function ownFolder(document, site) {
-	const file = fileURLToPath(document.uri);
-	const name = [...entriesOf(site, 'blueprint')].find(([, entry]) => entry.file === file)?.[0];
-
+	const name = ownName(document, site);
 	return name?.includes('/') ? name.split('/')[0] : null;
+}
+
+/**
+ * The fields defined at the top of a blueprint, for references in `fields: [intro]`.
+ * Only for the blueprints of pages, files, users and the site: a partial like
+ * `tabs/seo.yml` gets them from the blueprint that uses it. Null where unknown.
+ * @param {TextDocument} document
+ * @param {string} site
+ */
+function definitionsOf(document, site) {
+	const name = ownName(document, site);
+	const isModel = name === 'site' || ['pages', 'files', 'users'].includes(name?.split('/')[0]);
+
+	return isModel ? fieldDefinitions(document.getText(), blueprintFinder(site)) : null;
+}
+
+/**
+ * The block types `fieldsets` can name: the names of the `blocks/*` blueprints
+ * @param {string} site
+ * @returns {Map<string, import('./project.js').Entry>}
+ */
+function blockTypesOf(site) {
+	return new Map([...entriesOf(site, 'blueprint')].filter(([name]) => /^blocks\/[^/]+$/.test(name)).map(([name, entry]) => [name.slice(7), entry]));
+}
+
+/**
+ * Completion in a list item of `fields` (the fields defined at the top) or of `fieldsets` (block types)
+ * @param {TextDocument} document
+ * @param {{ line: number, character: number }} position
+ * @param {string} site
+ */
+function listItemCompletion(document, position, site) {
+	const context = listItemContext(document.getText(), document.offsetAt(position));
+
+	if (context === null) {
+		return null;
+	}
+
+	const range = { start: document.positionAt(context.start), end: position };
+	const item = (label, detail, sortText) => ({ label, kind: CompletionItemKind.Reference, detail, filterText: label, sortText, textEdit: { range, newText: label } });
+
+	if (context.list === 'fieldsets') {
+		return [...blockTypesOf(site)].map(([name, entry]) => item(name, origin(entry, site), (entry.source === 'kirby' ? '1' : '0') + name));
+	}
+
+	const definitions = definitionsOf(document, site);
+	return definitions === null ? null : [...definitions.keys()].map((name, index) => item(name, 'defined at the top', String(index).padStart(3, '0')));
+}
+
+/**
+ * Warnings for references to fields that aren't defined at the top of the blueprint,
+ * and for block types in `fieldsets` without a blueprint
+ * @param {TextDocument} document
+ * @param {string} site
+ */
+function referenceDiagnostics(document, site) {
+	const diagnostics = [];
+	const warn = (start, end, message, severity = DiagnosticSeverity.Warning) => diagnostics.push({ severity, range: { start: document.positionAt(start), end: document.positionAt(end) }, message, source: 'Kirby' });
+	const definitions = definitionsOf(document, site);
+
+	for (const reference of definitions === null ? [] : fieldReferences(document.getText())) {
+		if (definitions.has(reference.name) === false) {
+			warn(reference.start, reference.end, `Field “${reference.name}” is not defined in fields at the top of the blueprint. Kirby shows an error instead.`);
+		}
+	}
+
+	const { blueprints, complete } = blueprintsOf(site);
+
+	for (const reference of fieldsetReferences(document.getText())) {
+		if (blueprints.has(reference.blueprint) === false) {
+			const message = `Block type “${reference.name}” not found: there is no blueprint ${reference.blueprint}, so the block has no fields.`;
+			warn(reference.start, reference.end, complete ? message : message + ' (Some plugins register blueprints in a way that couldn’t be read.)', complete ? DiagnosticSeverity.Warning : DiagnosticSeverity.Information);
+		}
+	}
+
+	return diagnostics;
 }
 
 /**
@@ -728,7 +816,7 @@ function origin(entry, site) {
 
 /**
  * Markdown for a snippet or collection: its origin and what it expects or returns
- * @param {import('./calls.js').Kind | 'blueprint' | 'variable'} kind
+ * @param {import('./calls.js').Kind | 'blueprint' | 'variable' | 'field'} kind
  * @param {string} name
  * @param {import('./project.js').Entry & { value?: string }} entry
  * @param {string} site
@@ -749,7 +837,7 @@ function describe(kind, name, entry, site) {
 
 	const lines = [`**${name}** · ${origin(entry, site)}`];
 
-	if (kind === 'asset' || kind === 'blueprint') {
+	if (kind === 'asset' || kind === 'blueprint' || kind === 'field') {
 		return lines.join('\n');
 	}
 
@@ -777,7 +865,10 @@ function lookup(textDocument, position) {
 	const site = document ? siteFor(document.uri) : null;
 	const offset = document?.offsetAt(position);
 	const blueprint = site !== null && isBlueprint(document) === true;
-	const reference = blueprint ? referenceAt(document.getText(), offset) : null;
+	const covers = ({ start, end }) => offset >= start && offset <= end;
+	const fieldset = blueprint ? fieldsetReferences(document.getText()).find(covers) ?? null : null;
+	const reference = blueprint ? referenceAt(document.getText(), offset) ?? (fieldset === null ? null : { ...fieldset, name: fieldset.blueprint }) : null;
+	const field = blueprint && reference === null ? fieldReferences(document.getText()).find(covers) ?? null : null;
 	const slot = blueprint && reference === null ? templateSlotAt(document, offset, site) : null;
 	let name = site === null ? null : nameAt(document.getText(), offset);
 	let entry;
@@ -785,6 +876,11 @@ function lookup(textDocument, position) {
 	if (reference !== null) {
 		name = { kind: 'blueprint', ...reference };
 		entry = entriesOf(site, 'blueprint').get(reference.name);
+	} else if (field !== null) {
+		// A field defined at the top of this blueprint
+		const at = definitionsOf(document, site)?.get(field.name) ?? -1;
+		name = { kind: 'field', ...field };
+		entry = at === -1 ? undefined : { file: fileURLToPath(document.uri), line: document.positionAt(at).line, source: 'site' };
 	} else if (slot?.name) {
 		name = { kind: 'template', ...slot };
 		entry = templateEntry(templatesOf(site, slot.folder).get(slot.name));
@@ -939,7 +1035,7 @@ function validate(document) {
 	diagnostics.push(...variableDiagnostics(document, site));
 
 	if (isBlueprint(document) === true) {
-		diagnostics.push(...blueprintDiagnostics(document, site));
+		diagnostics.push(...blueprintDiagnostics(document, site), ...referenceDiagnostics(document, site));
 
 		for (const slot of slotsOf(document, site)) {
 			if (slot.name && templatesOf(site, slot.folder).has(slot.name) === false) {
@@ -995,7 +1091,7 @@ connection.onCompletion(({ textDocument, position }) => {
 		const templates = templateCompletion(document, position, site);
 		const values = valueCompletion(document, position, site);
 		const both = templates === null && values === null ? null : [...templates ?? [], ...values ?? []];
-		const items = typeCompletion(document, position) ?? extendsCompletion(document, position, site) ?? both ?? propertyCompletion(document, position, site);
+		const items = typeCompletion(document, position) ?? extendsCompletion(document, position, site) ?? both ?? listItemCompletion(document, position, site) ?? propertyCompletion(document, position, site);
 
 		if (items !== null) {
 			return items;

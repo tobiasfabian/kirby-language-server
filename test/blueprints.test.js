@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { blueprintFields, blueprintReferences, extend, extendsContext, fieldProperties, fieldTypes, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from '../src/blueprints.js';
+import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from '../src/blueprints.js';
 
 /**
  * Puts the cursor at `▮`
@@ -239,4 +239,35 @@ test('knows the literal values of a PHP type', () => {
 	assert.deepEqual(literalValues('array|string|false|null'), ['false', 'null']);
 	assert.deepEqual(literalValues('string'), []);
 	assert.deepEqual(literalValues('array|string|null'), []);
+});
+
+test('finds references to fields defined at the top', () => {
+	const text = 'fields:\n  intro: true\n  text:\n    type: textarea\ntabs:\n  content:\n    columns:\n      - fields:\n          - intro\n          - "nope"\n      - fields: [text]';
+
+	assert.deepEqual(fieldReferences(text).map(({ name }) => name), ['intro', 'nope', 'text']);
+	assert.deepEqual(fieldReferences('create:\n  fields:\n    - price'), []);
+	assert.deepEqual([...fieldDefinitions(text, () => null)], [['intro', 10], ['text', 24]]);
+
+	// Without tabs, columns or sections, fields at the top are the blueprint's own
+	assert.deepEqual([...fieldDefinitions('fields:\n  intro: true', () => null)], []);
+
+	// Fields from a blueprint it extends, or unknown if that can't be read
+	assert.deepEqual([...fieldDefinitions('extends: pages/base\ntabs: {}', () => ({ fields: { seo: true } }))], [['seo', -1]]);
+	assert.equal(fieldDefinitions('extends: pages/missing\ntabs: {}', () => null), null);
+});
+
+test('finds the block types of fieldsets', () => {
+	const text = 'fieldsets:\n  - heading\nlayout:\n  fieldsets:\n    text: true\n    quote: blocks/quote\n    hidden: false\n    main:\n      type: group\n      fieldsets: [image]\n    custom:\n      fields: {}';
+
+	assert.deepEqual(fieldsetReferences(text).map(({ name, blueprint }) => [name, blueprint]), [['heading', 'blocks/heading'], ['text', 'blocks/text'], ['blocks/quote', 'blocks/quote'], ['image', 'blocks/image']]);
+});
+
+test('detects list items of fields and fieldsets', () => {
+	const at = (text) => listItemContext(text.replace('▮', ''), text.indexOf('▮'));
+
+	assert.deepEqual(at('tabs:\n  a:\n    fields:\n      - in▮'), { list: 'fields', prefix: 'in', start: 31 });
+	assert.equal(at('text:\n  fieldsets:\n    - ▮')?.list, 'fieldsets');
+	assert.equal(at('text:\n  fieldsets:\n    he▮')?.list, 'fieldsets');
+	assert.equal(at('tags:\n  options:\n    - ▮'), null);
+	assert.equal(at('fields:\n  intro:\n    ty▮'), null);
 });

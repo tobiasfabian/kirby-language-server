@@ -1,0 +1,28 @@
+title: Article
+
+fields:
+  intro:
+    type: textarea
+  text:
+    type: blocks
+    fieldsets:
+      - heading
+      - text
+      - missing-block
+  layout:
+    type: layout
+    fieldsets:
+      main:
+        type: group
+        fieldsets:
+          - image
+      custom: blocks/custom-missing
+
+tabs:
+  content:
+    columns:
+      - fields:
+          - intro
+          - text
+          - nope
+      - fields: [layout]

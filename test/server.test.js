@@ -510,3 +510,31 @@ test('doesn’t warn about variables of snippets or of controllers it can’t re
 	const template = openPhp('templates/default.php', '<?php extract($data) ?><?= $title ?>');
 	assert.deepEqual(await diagnosticsOf(template.uri), []);
 });
+
+test('completes, checks and opens fields defined at the top and block types', async () => {
+	const { uri, position } = openBlueprint('pages/article');
+
+	assert.deepEqual(await diagnosticsOf(uri), [
+		'Field “nope” is not defined in fields at the top of the blueprint. Kirby shows an error instead.',
+		'Block type “missing-block” not found: there is no blueprint blocks/missing-block, so the block has no fields.',
+		'Block type “blocks/custom-missing” not found: there is no blueprint blocks/custom-missing, so the block has no fields.',
+	]);
+
+	const fields = await request('textDocument/completion', { textDocument: { uri }, position: position('- nope', 2) });
+	assert.deepEqual(fields.map((item) => item.label), ['intro', 'text', 'layout']);
+
+	const blocks = (await request('textDocument/completion', { textDocument: { uri }, position: position('- heading', 4) })).map((item) => item.label);
+	assert.ok(blocks.includes('heading') && blocks.includes('gallery'));
+
+	const [link] = await request('textDocument/definition', { textDocument: { uri }, position: position('- intro', 4) });
+	assert.deepEqual([fileURLToPath(link.targetUri), link.targetSelectionRange.start.line], [`${project}/public/site/blueprints/pages/article.yml`, 3]);
+
+	const [block] = await request('textDocument/definition', { textDocument: { uri }, position: position('- image', 4) });
+	assert.equal(fileURLToPath(block.targetUri), `${project}/public/kirby/config/blocks/image/image.yml`);
+});
+
+test('doesn’t check field references in partials', async () => {
+	const uri = pathToFileURL(`${project}/public/site/blueprints/tabs/content.yml`).href;
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'yaml', version: 1, text: 'label: Content\nfields:\n  - intro\n' } } });
+	assert.deepEqual(await diagnosticsOf(uri), []);
+});
