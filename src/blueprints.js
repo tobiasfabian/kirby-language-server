@@ -6,6 +6,7 @@
  */
 
 import { isMap, isPair, isScalar, isSeq, parseDocument, visit } from 'yaml';
+import properties from './field-properties.json' with { type: 'json' };
 
 // Kirby 6 field types (pages, files and users are deprecated aliases)
 const FIELD_TYPES = [
@@ -424,4 +425,84 @@ export function templateSlots(text, find, own = 'pages') {
 	});
 
 	return slots;
+}
+
+// A group isn't a field class: Kirby's Normalizer puts its fields in its place and passes `when` on to them
+const GROUP = [
+	{ name: 'fields', type: 'array', description: 'The fields of the group, shown as if they were its siblings' },
+	{ name: 'when', type: 'array|null', description: 'Shows the fields of the group only when the conditions are met' },
+];
+
+/**
+ * @typedef {object} FieldProperty
+ * @property {string} name
+ * @property {string} type PHP type, e.g. `string|null`
+ * @property {string} [default]
+ * @property {string} [description]
+ */
+
+/**
+ * The options of a Kirby 6 field type (read from Kirby's source by scripts/field-properties.mjs)
+ * @param {string} type
+ * @returns {FieldProperty[] | null}
+ */
+export function fieldProperties(type) {
+	return type === 'group' ? GROUP : properties.fields[ALIASES[type] ?? type] ?? null;
+}
+
+/**
+ * If the cursor is where a key of a field goes (a line with nothing but the start
+ * of a key), returns the part typed so far, where it starts, the field's name,
+ * its `type` and `extends` if set, and the keys it already has
+ * @param {string} text
+ * @param {number} offset
+ * @returns {{ prefix: string, start: number, name: string, type?: string, extends?: string, present: string[] } | null}
+ */
+export function propertyContext(text, offset) {
+	const { before, lines } = positionInfo(text, offset);
+	const match = before.match(/^( +)([\w-]*)$/);
+
+	if (match === null) {
+		return null;
+	}
+
+	// keys: the field, then `fields`
+	const indent = match[1].length;
+	const keys = ancestors(lines, lines.length - 1, indent);
+
+	if (keys[0] === undefined || keys[0].key === '-' || keys[1]?.key !== 'fields' || isContainer(keys, 1) === false) {
+		return null;
+	}
+
+	// The field's other keys, above and below the cursor
+	const all = text.split('\n');
+	const own = [];
+
+	for (let i = keys[0].line + 1; i < all.length; i++) {
+		const trimmed = all[i].trimStart();
+		const lineIndent = all[i].length - trimmed.length;
+
+		if (i === lines.length || trimmed === '' || trimmed.startsWith('#')) {
+			continue;
+		}
+
+		if (lineIndent <= keys[0].indent) {
+			break;
+		}
+
+		if (lineIndent === indent) {
+			own.push(trimmed);
+		}
+	}
+
+	const value = (key) => own.map((line) => line.match(new RegExp(`^${key}:\\s*["']?([\\w./-]+)`))?.[1]).find((found) => found !== undefined);
+
+	return {
+		prefix: match[2],
+		start: offset - match[2].length,
+		name: keys[0].key,
+		type: value('type'),
+		extends: value('extends'),
+		present: own.map((line) => line.match(/^([\w-]+)\s*:/)?.[1]).filter((key) => key !== undefined),
+	};
 }

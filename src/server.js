@@ -11,7 +11,7 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { blueprintReferences, extendsContext, fieldTypes, isFieldType, referenceAt, templateSlots, typeContext } from './blueprints.js';
+import { blueprintReferences, extend, extendsContext, fieldProperties, fieldTypes, isFieldType, propertyContext, referenceAt, templateSlots, typeContext } from './blueprints.js';
 import { completionContext, findCalls, nameAt, propsContext } from './calls.js';
 import { collectionSignature, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listDocroot, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
 
@@ -140,6 +140,40 @@ function assetCompletion(document, position, site, context) {
 function assetEntry(site, name) {
 	const asset = findAsset(site, name);
 	return asset === null || asset.directory === true ? undefined : { file: asset.file, line: 0, source: 'site' };
+}
+
+/**
+ * Completion for the keys of a field: the options of its type (from `type`, what it
+ * extends, or its name), without those it already has. Without a known type, `type` and `extends`.
+ * @param {TextDocument} document
+ * @param {{ line: number, character: number }} position
+ * @param {string} site
+ */
+function propertyCompletion(document, position, site) {
+	const context = propertyContext(document.getText(), document.offsetAt(position));
+
+	if (context === null) {
+		return null;
+	}
+
+	const extended = context.extends === undefined ? null : extend({ extends: context.extends }, blueprintFinder(site));
+	const type = context.type ?? extended?.type ?? context.name;
+	const options = [
+		{ name: 'type', type: 'string', description: 'The field type' },
+		{ name: 'extends', type: 'string', description: 'A blueprint whose props this field takes over' },
+		...fieldProperties(type) ?? [],
+	];
+	const range = { start: document.positionAt(context.start), end: position };
+
+	return options.filter(({ name }) => context.present.includes(name) === false).map((option, index) => ({
+		label: option.name,
+		kind: CompletionItemKind.Property,
+		detail: option.default === undefined ? option.type : `${option.type} = ${shorten(option.default)}`,
+		documentation: option.description === undefined ? undefined : { kind: MarkupKind.Markdown, value: option.description },
+		filterText: option.name,
+		sortText: String(index).padStart(3, '0'),
+		textEdit: { range, newText: option.name + ': ' },
+	}));
 }
 
 /**
@@ -632,7 +666,7 @@ connection.onCompletion(({ textDocument, position }) => {
 	const site = document ? siteFor(document.uri) : null;
 
 	if (site !== null && isBlueprint(document) === true) {
-		const items = typeCompletion(document, position) ?? extendsCompletion(document, position, site) ?? templateCompletion(document, position, site);
+		const items = typeCompletion(document, position) ?? extendsCompletion(document, position, site) ?? templateCompletion(document, position, site) ?? propertyCompletion(document, position, site);
 
 		if (items !== null) {
 			return items;

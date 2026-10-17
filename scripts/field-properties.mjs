@@ -1,0 +1,185 @@
+/**
+ * Writes src/field-properties.json: the options of each Kirby 6 field type,
+ * read from Kirby's source. The options of a field are the parameters of
+ * its class's constructor and those of its parents; their descriptions
+ * and defaults come from the properties of the same name (in the classes
+ * or their mixins).
+ *
+ *   node scripts/field-properties.mjs path/to/kirby
+ */
+
+import fs from 'node:fs';
+import path from 'node:path';
+
+const kirby = process.argv[2];
+
+if (kirby === undefined || fs.existsSync(path.join(kirby, 'src', 'Form', 'Field')) === false) {
+	console.error('Usage: node scripts/field-properties.mjs path/to/kirby (Kirby 6)');
+	process.exit(1);
+}
+
+const src = path.join(kirby, 'src');
+const read = (file) => fs.readFileSync(file, 'utf8');
+
+/**
+ * Splits code at commas that aren't inside brackets or strings
+ * @param {string} code
+ */
+function splitTopLevel(code) {
+	const parts = [];
+	let depth = 0;
+	let quote = null;
+	let start = 0;
+
+	for (let i = 0; i < code.length; i++) {
+		const char = code[i];
+
+		if (quote !== null) {
+			if (char === '\\') {
+				i++;
+			} else if (char === quote) {
+				quote = null;
+			}
+		} else if (char === '\'' || char === '"') {
+			quote = char;
+		} else if ('([{'.includes(char)) {
+			depth++;
+		} else if (')]}'.includes(char)) {
+			depth--;
+		} else if (char === ',' && depth === 0) {
+			parts.push(code.slice(start, i));
+			start = i + 1;
+		}
+	}
+
+	parts.push(code.slice(start));
+
+	return parts.map((part) => part.trim()).filter((part) => part !== '');
+}
+
+/**
+ * The text of a docblock without stars and tags
+ * @param {string} docblock
+ */
+function description(docblock) {
+	return docblock
+		.split('\n')
+		.map((line) => line.replace(/^\s*\*\s?/, '').trim())
+		.filter((line) => line !== '' && line.startsWith('@') === false)
+		.join(' ');
+}
+
+/**
+ * The file of a class or trait of Kirby\Form
+ * @param {string} name
+ */
+function fileOf(name) {
+	return [
+		path.join(src, 'Form', 'Field', name + '.php'),
+		path.join(src, 'Form', name + '.php'),
+		path.join(src, 'Form', 'Mixin', name + '.php'),
+	].find((file) => fs.existsSync(file)) ?? null;
+}
+
+/**
+ * Reads a class or trait: its parent, traits, constructor parameters and properties
+ * @param {string} name
+ */
+function parse(name) {
+	const file = fileOf(name);
+
+	if (file === null) {
+		return { parent: null, traits: [], params: [], properties: new Map() };
+	}
+
+	const code = read(file);
+	const constructor = code.match(/function __construct\(([\s\S]*?)\)\s*\{/)?.[1] ?? '';
+	const params = splitTopLevel(constructor)
+		.filter((param) => param.includes('...') === false)
+		.map((param) => param.match(/^(?:#\[[^\]]*\]\s*)*(?:(?:public|protected|private)\s+)?([^\s$]+)\s+\$(\w+)(?:\s*=\s*(.+))?$/s))
+		.filter((match) => match !== null)
+		.map(([, type, param, value]) => ({ name: param, type, default: value?.trim() }));
+
+	const properties = new Map();
+	const declaration = /(?:\/\*\*((?:(?!\*\/)[\s\S])*)\*\/\s*)?(?:#\[[^\]]*\]\s*)*(?:protected|public)\s+(?:static\s+)?[^\s$(]+\s+\$(\w+)(?:\s*=\s*([^;]+))?;/g;
+
+	for (const [, docblock, property, value] of code.matchAll(declaration)) {
+		properties.set(property, { description: docblock === undefined ? '' : description(docblock), default: value?.trim() });
+	}
+
+	return {
+		parent: code.match(/\bclass\s+\w+\s+extends\s+(\w+)/)?.[1] ?? null,
+		traits: [...code.matchAll(/^\s*use\s+(?:Mixin\\)?(\w+);/gm)].map(([, trait]) => trait),
+		params,
+		properties,
+	};
+}
+
+/**
+ * The properties of a class and its traits (and theirs)
+ * @param {ReturnType<typeof parse>} parsed
+ * @param {Map<string, { description: string, default?: string }>} into
+ */
+function collectProperties(parsed, into) {
+	for (const [name, property] of parsed.properties) {
+		const known = into.get(name);
+
+		// A subclass may only set the default; the description is in the parent or a mixin
+		into.set(name, {
+			description: known?.description || property.description,
+			default: known?.default ?? property.default,
+		});
+	}
+
+	for (const trait of parsed.traits) {
+		collectProperties(parse(trait), into);
+	}
+}
+
+/**
+ * The options of a field class: its constructor parameters, then those of its parents
+ * @param {string} name
+ */
+function optionsOf(name) {
+	const options = [];
+	const properties = new Map();
+
+	for (let current = name; current !== null;) {
+		const parsed = parse(current);
+		collectProperties(parsed, properties);
+
+		for (const param of parsed.params) {
+			if (param.name !== 'name' && options.some((option) => option.name === param.name) === false) {
+				options.push(param);
+			}
+		}
+
+		current = parsed.parent;
+	}
+
+	return options.map((option) => {
+		const property = properties.get(option.name);
+		const value = (option.default === undefined || option.default === 'null' ? property?.default : option.default)?.replace(/^'(.*)'$/s, '$1');
+
+		return {
+			name: option.name,
+			type: option.type,
+			...(value === undefined || value === 'null' ? {} : { default: value }),
+			...(property?.description ? { description: property.description } : {}),
+		};
+	});
+}
+
+// Field types and their classes, from Core::fields()
+const core = read(path.join(src, 'Cms', 'Core.php'));
+const body = core.slice(core.indexOf('function fields()'));
+const types = [...body.slice(0, body.indexOf('];')).matchAll(/'([\w-]+)'\s*=>\s*(\w+)::class/g)];
+
+const output = {
+	kirby: JSON.parse(read(path.join(kirby, 'composer.json'))).version,
+	fields: Object.fromEntries(types.map(([, type, name]) => [type, optionsOf(name)])),
+};
+
+const target = new URL('../src/field-properties.json', import.meta.url);
+fs.writeFileSync(target, JSON.stringify(output, null, '\t') + '\n');
+console.log(`Wrote ${Object.keys(output.fields).length} field types of Kirby ${output.kirby} to src/field-properties.json`);

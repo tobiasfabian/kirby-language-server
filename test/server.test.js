@@ -365,3 +365,16 @@ test('completes and opens templates in PHP', async () => {
 	const [link] = await request('textDocument/definition', { textDocument: { uri: templateUri }, position: positionOf(`'note'`, 2) });
 	assert.equal(fileURLToPath(link.targetUri), `${project}/public/site/templates/note.php`);
 });
+
+test('completes the options of a field', async () => {
+	const { uri, position } = openBlueprint('pages/project');
+	const items = await request('textDocument/completion', { textDocument: { uri }, position: position('label: Titelbild', 2) });
+	const labels = items.map((item) => item.label);
+
+	// cover extends fields/cover, a filepicker
+	assert.ok(labels.includes('uploads'));
+	assert.ok(labels.includes('label'));
+	assert.equal(labels.includes('extends'), false);
+	assert.equal(items.find((item) => item.label === 'multiple').detail, 'bool|null = true');
+	assert.equal(items.find((item) => item.label === 'multiple').textEdit.newText, 'multiple: ');
+});

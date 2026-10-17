@@ -1,13 +1,14 @@
 {
   "name": "kirby-language-server",
   "version": "0.1.0",
-  "description": "Language server for Kirby CMS projects: completion, navigation and warnings for snippets.",
+  "description": "Language server for Kirby CMS 6 projects: completion, navigation and warnings for snippets, collections, translations, assets, templates and blueprints.",
   "type": "module",
   "scripts": {
     "build": "node ./build.mjs",
     "dev": "node ./build.mjs --dev",
     "lint": "eslint .",
-    "test": "node --test"
+    "test": "node --test",
+    "field-properties": "node ./scripts/field-properties.mjs"
   },
   "author": "Tobias Wolf (https://tobiaswolf.me)",
   "license": "MIT",

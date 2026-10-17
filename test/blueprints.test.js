@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { blueprintReferences, extend, extendsContext, fieldTypes, referenceAt, templateSlots, typeContext } from '../src/blueprints.js';
+import { blueprintReferences, extend, extendsContext, fieldProperties, fieldTypes, propertyContext, referenceAt, templateSlots, typeContext } from '../src/blueprints.js';
 
 /**
  * Puts the cursor at `▮`
@@ -171,4 +171,29 @@ test('finds where a blueprint names templates', () => {
 	// Nothing typed yet, also in the middle of a blueprint
 	const text = 'fields:\n  list:\n    type: pagelist\n    template: \n    label: List';
 	assert.deepEqual(templateSlots(text, find), [{ name: null, start: text.indexOf('template: ') + 10, end: text.indexOf('template: ') + 10, folder: 'pages' }]);
+});
+
+test('knows the options of Kirby 6 field types', () => {
+	const pagelist = fieldProperties('pagelist');
+
+	assert.ok(pagelist.some(({ name }) => name === 'templatesIgnore'));
+	assert.equal(pagelist.some(({ name }) => name === 'headline' || name === 'name'), false);
+	assert.deepEqual(fieldProperties('text').find(({ name }) => name === 'counter'), { name: 'counter', type: 'bool|null', default: 'true', description: 'Shows or hides the character counter in the top right corner' });
+	assert.equal(fieldProperties('pages'), fieldProperties('pagepicker'));
+	assert.equal(fieldProperties('unknown'), null);
+
+	for (const { name } of fieldTypes().filter(({ replacement }) => replacement === undefined)) {
+		assert.notEqual(fieldProperties(name), null, name);
+	}
+});
+
+test('detects where a key of a field goes', () => {
+	const at = (text) => propertyContext(text.replace('▮', ''), text.indexOf('▮'));
+
+	assert.deepEqual(at('fields:\n  title:\n    type: text\n    la▮\n    required: true\n  other:\n    type: textarea'), { prefix: 'la', start: 36, name: 'title', type: 'text', extends: undefined, present: ['type', 'required'] });
+	assert.deepEqual(at('columns:\n  - width: 1/2\n    fields:\n      cover:\n        extends: fields/cover\n        ▮')?.extends, 'fields/cover');
+	assert.equal(at('fields:\n  blocks:\n    ▮')?.name, 'blocks');
+	assert.equal(at('tabs:\n  seo:\n    ▮'), null);
+	assert.equal(at('sections:\n  fields:\n    type: fields\n    ▮'), null);
+	assert.equal(at('fields:\n  title:\n    label: ▮'), null);
 });

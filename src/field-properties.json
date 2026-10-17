@@ -1,0 +1,3386 @@
+{
+	"kirby": "6.0.0-beta.1",
+	"fields": {
+		"blocks": [
+			{
+				"name": "default",
+				"type": "array|null",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "empty",
+				"type": "array|string|null",
+				"description": "Sets the text for the empty state box"
+			},
+			{
+				"name": "fieldsets",
+				"type": "array|null",
+				"description": "Defines the allowed block types in the blocks field. See below."
+			},
+			{
+				"name": "group",
+				"type": "string|null",
+				"default": "blocks",
+				"description": "Group name to identify all block fields that can share blocks via drag & drop"
+			},
+			{
+				"name": "max",
+				"type": "int|null",
+				"description": "Sets the maximum number of allowed items in the field"
+			},
+			{
+				"name": "min",
+				"type": "int|null",
+				"description": "Sets the minimum number of required items in the field"
+			},
+			{
+				"name": "pretty",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Saves pretty printed JSON in text files"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"buttons": [
+			{
+				"name": "buttons",
+				"type": "array|string|null",
+				"default": "[]",
+				"description": "Array or query string for buttons"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"checkboxes": [
+			{
+				"name": "batch",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Show/hide the batch select interface"
+			},
+			{
+				"name": "columns",
+				"type": "int|null",
+				"default": "1",
+				"description": "Arranges the inputs in the given number of columns"
+			},
+			{
+				"name": "max",
+				"type": "int|null",
+				"description": "Sets the maximum number of allowed items in the field"
+			},
+			{
+				"name": "min",
+				"type": "int|null",
+				"description": "Sets the minimum number of required items in the field"
+			},
+			{
+				"name": "options",
+				"type": "array|string|null",
+				"description": "An array with options"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"color": [
+			{
+				"name": "alpha",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Whether to allow alpha transparency in the color"
+			},
+			{
+				"name": "format",
+				"type": "string|null",
+				"default": "hex",
+				"description": "The CSS format (hex, rgb, hsl) to display and store the value"
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "mode",
+				"type": "string|null",
+				"default": "picker",
+				"description": "Change mode to disable the color picker (`input`) or to only show the `options` as toggles"
+			},
+			{
+				"name": "placeholder",
+				"type": "array|string|null",
+				"description": "Optional placeholder value that will be shown when the field is empty"
+			},
+			{
+				"name": "options",
+				"type": "array|string|null",
+				"description": "An array with options"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"date": [
+			{
+				"name": "calendar",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Activate/deactivate the dropdown calendar"
+			},
+			{
+				"name": "time",
+				"type": "bool|array|null",
+				"default": "false",
+				"description": "Pass `true` or an array of time field options to show the time selector."
+			},
+			{
+				"name": "display",
+				"type": "string|null",
+				"default": "YYYY-MM-DD",
+				"description": "Custom format (dayjs tokens: `DD`, `MM`, `YYYY`) that is used to display the field in the Panel"
+			},
+			{
+				"name": "format",
+				"type": "string|null",
+				"description": "Defines a custom format that is used when the field is saved"
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"default": "calendar",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "max",
+				"type": "string|null",
+				"description": "Latest date, which can be selected/saved (Y-m-d)"
+			},
+			{
+				"name": "min",
+				"type": "string|null",
+				"description": "Earliest date, which can be selected/saved (Y-m-d)"
+			},
+			{
+				"name": "step",
+				"type": "array|int|string|null",
+				"default": "['size' => 1, 'unit' => 'day']",
+				"description": "Round to the nearest: sub-options for `unit` (day) and `size` (1)"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"email": [
+			{
+				"name": "after",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown after the input"
+			},
+			{
+				"name": "autocomplete",
+				"type": "string|null",
+				"default": "email",
+				"description": "Sets the HTML5 autocomplete mode for the input"
+			},
+			{
+				"name": "before",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown before the input"
+			},
+			{
+				"name": "converter",
+				"type": "string|null",
+				"description": "The field value will be converted with the selected converter before the value gets saved. Available converters: `lower`, `upper`, `ucfirst`, `slug`"
+			},
+			{
+				"name": "counter",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Shows or hides the character counter in the top right corner"
+			},
+			{
+				"name": "font",
+				"type": "string|null",
+				"default": "sans-serif",
+				"description": "Sets the font family (sans or monospace)"
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"default": "email",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "pattern",
+				"type": "string|null",
+				"description": "A regular expression, which will be used to validate the input"
+			},
+			{
+				"name": "maxlength",
+				"type": "int|null",
+				"description": "Maximum number of allowed characters"
+			},
+			{
+				"name": "minlength",
+				"type": "int|null",
+				"description": "Minimum number of required characters"
+			},
+			{
+				"name": "placeholder",
+				"type": "array|string|null",
+				"description": "Optional placeholder value that will be shown when the field is empty"
+			},
+			{
+				"name": "spellcheck",
+				"type": "bool|null",
+				"description": "If `false`, spellcheck will be switched off"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"entries": [
+			{
+				"name": "empty",
+				"type": "array|string|null",
+				"description": "Sets the text for the empty state box"
+			},
+			{
+				"name": "field",
+				"type": "array|string|null",
+				"default": "['type' => 'text']",
+				"description": "Field options for the field to be used and repeated. Supported field types are `color`, `date`, `email`, `number`, `select`, `slug`, `tel`, `text`, `time`, `url`."
+			},
+			{
+				"name": "max",
+				"type": "int|null",
+				"description": "Sets the maximum number of allowed items in the field"
+			},
+			{
+				"name": "min",
+				"type": "int|null",
+				"description": "Sets the minimum number of required items in the field"
+			},
+			{
+				"name": "sortable",
+				"type": "bool|null",
+				"default": "true",
+				"description": "If `true`, entries are sortable via drag & drop"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"filelist": [
+			{
+				"name": "create",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Option to switch off the upload button"
+			},
+			{
+				"name": "template",
+				"type": "string|null",
+				"description": "Filters the files by template and sets the template for all uploads"
+			},
+			{
+				"name": "batch",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Show/hide the batch select interface"
+			},
+			{
+				"name": "columns",
+				"type": "array|null",
+				"description": "Columns config for `layout: table`"
+			},
+			{
+				"name": "empty",
+				"type": "array|string|null",
+				"description": "Sets the text for the empty state box"
+			},
+			{
+				"name": "flip",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the order of the entries is reversed"
+			},
+			{
+				"name": "image",
+				"type": "array|string|false|null",
+				"default": "[]",
+				"description": "Image options for each entry, a query string for the preview image or `false` to disable previews"
+			},
+			{
+				"name": "info",
+				"type": "array|string|null",
+				"description": "Info text shown next to or below the main text of each entry"
+			},
+			{
+				"name": "layout",
+				"type": "string|null",
+				"default": "list",
+				"description": "Switch the layout of the items. Available layouts: `list`, `cardlets`, `cards` and `table`"
+			},
+			{
+				"name": "limit",
+				"type": "int|null",
+				"default": "20",
+				"description": "The number of entries that will be displayed on a single page. Afterwards pagination kicks in."
+			},
+			{
+				"name": "max",
+				"type": "int|null",
+				"description": "Sets the maximum number of allowed items in the field"
+			},
+			{
+				"name": "min",
+				"type": "int|null",
+				"description": "Sets the minimum number of required entries"
+			},
+			{
+				"name": "page",
+				"type": "int|null",
+				"description": "Sets the default page for the pagination"
+			},
+			{
+				"name": "parent",
+				"type": "string|null",
+				"description": "Query for the parent model that holds the entries"
+			},
+			{
+				"name": "query",
+				"type": "string|null",
+				"description": "Filters the entries by a query. Sorting will be disabled"
+			},
+			{
+				"name": "search",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Enables/disables the search"
+			},
+			{
+				"name": "size",
+				"type": "string|null",
+				"default": "auto",
+				"description": "Size for `layout: cards`. Available sizes: `auto`, `tiny`, `small`, `medium`, `large`, `huge`, `full`"
+			},
+			{
+				"name": "sortable",
+				"type": "bool|null",
+				"default": "true",
+				"description": "If `true`, entries are sortable via drag & drop"
+			},
+			{
+				"name": "sortBy",
+				"type": "string|null",
+				"description": "Sorts the entries by the given field and order (i.e. `title desc`) Drag & drop is disabled in this case"
+			},
+			{
+				"name": "text",
+				"type": "array|string|null",
+				"default": "{{ file.filename }}",
+				"description": "Setup for the main text of each entry"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"filepicker": [
+			{
+				"name": "parent",
+				"type": "string|null"
+			},
+			{
+				"name": "uploads",
+				"type": "mixed",
+				"description": "Sets the upload options for linked files"
+			},
+			{
+				"name": "empty",
+				"type": "array|string|null",
+				"description": "The placeholder text if none have been selected yet"
+			},
+			{
+				"name": "image",
+				"type": "array|null",
+				"description": "Image settings for each item"
+			},
+			{
+				"name": "info",
+				"type": "string|null",
+				"description": "Info text for each item"
+			},
+			{
+				"name": "layout",
+				"type": "string|null",
+				"default": "list",
+				"description": "Switch the layout of the items. Available layouts: `list`, `cardlets`, `cards` and `table`"
+			},
+			{
+				"name": "link",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Whether each item should be clickable"
+			},
+			{
+				"name": "max",
+				"type": "int|null",
+				"description": "Sets the maximum number of allowed items in the field"
+			},
+			{
+				"name": "min",
+				"type": "int|null",
+				"description": "Sets the minimum number of required items in the field"
+			},
+			{
+				"name": "multiple",
+				"type": "bool|null",
+				"default": "true",
+				"description": "If `false`, only a single one can be selected"
+			},
+			{
+				"name": "picker",
+				"type": "array|null",
+				"default": "[]",
+				"description": "Additional picker dialog props { image, layout, size }"
+			},
+			{
+				"name": "query",
+				"type": "string|null",
+				"description": "Query for the items to be included in the picker"
+			},
+			{
+				"name": "search",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Enable/disable the search field in the picker"
+			},
+			{
+				"name": "size",
+				"type": "string|null",
+				"default": "auto",
+				"description": "Size for `layout: cards`. Available sizes: `auto`, `tiny`, `small`, `medium`, `large`, `huge`, `full`"
+			},
+			{
+				"name": "store",
+				"type": "string|null",
+				"default": "uuid",
+				"description": "Whether to store `uuid` or `id` in the content file of the model"
+			},
+			{
+				"name": "text",
+				"type": "string|null",
+				"description": "Main text for each item"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"gap": [
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"headline": [
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"hidden": [
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"info": [
+			{
+				"name": "icon",
+				"type": "string|null",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "text",
+				"type": "array|string|null",
+				"description": "Text to be displayed"
+			},
+			{
+				"name": "theme",
+				"type": "string|null",
+				"description": "The design theme for the field"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"layout": [
+			{
+				"name": "layouts",
+				"type": "array|null",
+				"default": "['1/1']",
+				"description": "Define available layouts. Each layout is list of column widths. (e.g. 1/2, 1/2 or 1/4, 3/4)"
+			},
+			{
+				"name": "selector",
+				"type": "array|null",
+				"description": "Customize the `size` and `columns` in the layout selector to account for the number of different layouts you have defined via the layouts property. Available sizes: `small`, `medium` (default), `large`, `huge`. Default columns: `3`"
+			},
+			{
+				"name": "settings",
+				"type": "array|string|null",
+				"description": "Define tabs and fields for the layout settings. Layout settings are defined globally. Each layout will then get a \"Settings\" button in its dropdown and open a settings drawer with the configured fields."
+			},
+			{
+				"name": "default",
+				"type": "array|null",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "empty",
+				"type": "array|string|null",
+				"description": "Sets the text for the empty state box"
+			},
+			{
+				"name": "fieldsets",
+				"type": "array|null",
+				"description": "Defines the allowed block types in the blocks field. See below."
+			},
+			{
+				"name": "group",
+				"type": "string|null",
+				"default": "blocks",
+				"description": "Group name to identify all block fields that can share blocks via drag & drop"
+			},
+			{
+				"name": "max",
+				"type": "int|null",
+				"description": "Sets the maximum number of allowed items in the field"
+			},
+			{
+				"name": "min",
+				"type": "int|null",
+				"description": "Sets the minimum number of required items in the field"
+			},
+			{
+				"name": "pretty",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Saves pretty printed JSON in text files"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"line": [
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"link": [
+			{
+				"name": "options",
+				"type": "array|string|null",
+				"default": "['url', 'page', 'file', 'email', 'tel', 'anchor']",
+				"description": "Link types that can be selected. Available types: `anchor`, `custom`, `email`, `file`, `page`, `tel`, `url`"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"list": [
+			{
+				"name": "icon",
+				"type": "string|null",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "marks",
+				"type": "array|bool|null",
+				"description": "Sets the allowed HTML formats. Available formats: `bold`, `italic`, `underline`, `strike`, `code`, `link`, `email`. Activate/deactivate them all by passing `true`/`false`. Default marks are `bold`, `italic`, `underline`, `strike`, `link`, `email`"
+			},
+			{
+				"name": "nodes",
+				"type": "array|bool|null",
+				"description": "Sets the allowed nodes. Available nodes: `paragraph`, `heading`, `bulletList`, `orderedList`, `quote`. Activate/deactivate them all by passing `true`/`false`. Default nodes are `paragraph`, `heading`, `bulletList`, `orderedList`."
+			},
+			{
+				"name": "toolbar",
+				"type": "array|bool|null",
+				"description": "Toolbar options, incl. `marks` (to narrow down which marks should have toolbar buttons), `nodes` (to narrow down which nodes should have toolbar dropdown entries) and `inline` to set the position of the toolbar (false = sticking on top of the field)"
+			},
+			{
+				"name": "maxlength",
+				"type": "int|null",
+				"description": "Maximum number of allowed characters"
+			},
+			{
+				"name": "minlength",
+				"type": "int|null",
+				"description": "Minimum number of required characters"
+			},
+			{
+				"name": "placeholder",
+				"type": "array|string|null",
+				"description": "Optional placeholder value that will be shown when the field is empty"
+			},
+			{
+				"name": "spellcheck",
+				"type": "bool|null",
+				"description": "If `false`, spellcheck will be switched off"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"multiselect": [
+			{
+				"name": "accept",
+				"type": "string|null",
+				"default": "options",
+				"description": "If set to `all`, any type of input is accepted. If set to `options` only the predefined options are accepted as input."
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"default": "checklist",
+				"description": "Icon that will be shown at the end of the field"
+			},
+			{
+				"name": "layout",
+				"type": "string|null",
+				"description": "Set to `list` to display each tag with 100% width, otherwise the tags are displayed inline"
+			},
+			{
+				"name": "search",
+				"type": "array|bool|null",
+				"default": "true",
+				"description": "Enable/disable the search in the dropdown Also limit displayed items (display: 20) and set minimum number of characters to search (min: 3)"
+			},
+			{
+				"name": "separator",
+				"type": "string|null",
+				"default": ",",
+				"description": "Custom separator, which will be used to store a list of values in the content file"
+			},
+			{
+				"name": "sort",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, selected entries will be sorted according to their position in the dropdown"
+			},
+			{
+				"name": "max",
+				"type": "int|null",
+				"description": "Sets the maximum number of allowed items in the field"
+			},
+			{
+				"name": "min",
+				"type": "int|null",
+				"description": "Sets the minimum number of required items in the field"
+			},
+			{
+				"name": "options",
+				"type": "array|string|null",
+				"description": "An array with options"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"number": [
+			{
+				"name": "after",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown after the input"
+			},
+			{
+				"name": "before",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown before the input"
+			},
+			{
+				"name": "default",
+				"type": "float|string|null",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "placeholder",
+				"type": "array|string|null",
+				"description": "Optional placeholder value that will be shown when the field is empty"
+			},
+			{
+				"name": "max",
+				"type": "float|null",
+				"description": "The highest allowed number"
+			},
+			{
+				"name": "min",
+				"type": "float|null",
+				"description": "The lowest allowed number"
+			},
+			{
+				"name": "step",
+				"type": "float|string|null",
+				"description": "Allowed incremental steps between numbers (i.e `0.5`) Use `any` to allow any decimal value."
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"object": [
+			{
+				"name": "default",
+				"type": "array|null",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "empty",
+				"type": "array|string|null",
+				"description": "Sets the text for the empty state box"
+			},
+			{
+				"name": "fields",
+				"type": "array|null"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"pagelist": [
+			{
+				"name": "create",
+				"type": "array|string|bool|null",
+				"description": "Templates that may be added or `false` to disable page creation"
+			},
+			{
+				"name": "status",
+				"type": "string|null",
+				"default": "all",
+				"description": "Filters the pages by their status"
+			},
+			{
+				"name": "template",
+				"type": "string|array|null",
+				"description": "Filters the list by a single template"
+			},
+			{
+				"name": "templates",
+				"type": "array|string|null",
+				"description": "Filters the list by templates and sets the template options for newly created pages"
+			},
+			{
+				"name": "templatesIgnore",
+				"type": "array|string|null",
+				"default": "[]",
+				"description": "Excludes the given templates from the list"
+			},
+			{
+				"name": "batch",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Show/hide the batch select interface"
+			},
+			{
+				"name": "columns",
+				"type": "array|null",
+				"description": "Columns config for `layout: table`"
+			},
+			{
+				"name": "empty",
+				"type": "array|string|null",
+				"description": "Sets the text for the empty state box"
+			},
+			{
+				"name": "flip",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the order of the entries is reversed"
+			},
+			{
+				"name": "image",
+				"type": "array|string|false|null",
+				"default": "[]",
+				"description": "Image options for each entry, a query string for the preview image or `false` to disable previews"
+			},
+			{
+				"name": "info",
+				"type": "array|string|null",
+				"description": "Info text shown next to or below the main text of each entry"
+			},
+			{
+				"name": "layout",
+				"type": "string|null",
+				"default": "list",
+				"description": "Switch the layout of the items. Available layouts: `list`, `cardlets`, `cards` and `table`"
+			},
+			{
+				"name": "limit",
+				"type": "int|null",
+				"default": "20",
+				"description": "The number of entries that will be displayed on a single page. Afterwards pagination kicks in."
+			},
+			{
+				"name": "max",
+				"type": "int|null",
+				"description": "Sets the maximum number of allowed items in the field"
+			},
+			{
+				"name": "min",
+				"type": "int|null",
+				"description": "Sets the minimum number of required entries"
+			},
+			{
+				"name": "page",
+				"type": "int|null",
+				"description": "Sets the default page for the pagination"
+			},
+			{
+				"name": "parent",
+				"type": "string|null",
+				"description": "Query for the parent model that holds the entries"
+			},
+			{
+				"name": "query",
+				"type": "string|null",
+				"description": "Filters the entries by a query. Sorting will be disabled"
+			},
+			{
+				"name": "search",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Enables/disables the search"
+			},
+			{
+				"name": "size",
+				"type": "string|null",
+				"default": "auto",
+				"description": "Size for `layout: cards`. Available sizes: `auto`, `tiny`, `small`, `medium`, `large`, `huge`, `full`"
+			},
+			{
+				"name": "sortable",
+				"type": "bool|null",
+				"default": "true",
+				"description": "If `true`, entries are sortable via drag & drop"
+			},
+			{
+				"name": "sortBy",
+				"type": "string|null",
+				"description": "Sorts the entries by the given field and order (i.e. `title desc`) Drag & drop is disabled in this case"
+			},
+			{
+				"name": "text",
+				"type": "array|string|null",
+				"default": "{{ model.title }}",
+				"description": "Setup for the main text of each entry"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"pagepicker": [
+			{
+				"name": "subpages",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Optionally include subpages of pages"
+			},
+			{
+				"name": "empty",
+				"type": "array|string|null",
+				"description": "The placeholder text if none have been selected yet"
+			},
+			{
+				"name": "image",
+				"type": "array|null",
+				"description": "Image settings for each item"
+			},
+			{
+				"name": "info",
+				"type": "string|null",
+				"description": "Info text for each item"
+			},
+			{
+				"name": "layout",
+				"type": "string|null",
+				"default": "list",
+				"description": "Switch the layout of the items. Available layouts: `list`, `cardlets`, `cards` and `table`"
+			},
+			{
+				"name": "link",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Whether each item should be clickable"
+			},
+			{
+				"name": "max",
+				"type": "int|null",
+				"description": "Sets the maximum number of allowed items in the field"
+			},
+			{
+				"name": "min",
+				"type": "int|null",
+				"description": "Sets the minimum number of required items in the field"
+			},
+			{
+				"name": "multiple",
+				"type": "bool|null",
+				"default": "true",
+				"description": "If `false`, only a single one can be selected"
+			},
+			{
+				"name": "picker",
+				"type": "array|null",
+				"default": "[]",
+				"description": "Additional picker dialog props { image, layout, size }"
+			},
+			{
+				"name": "query",
+				"type": "string|null",
+				"description": "Query for the items to be included in the picker"
+			},
+			{
+				"name": "search",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Enable/disable the search field in the picker"
+			},
+			{
+				"name": "size",
+				"type": "string|null",
+				"default": "auto",
+				"description": "Size for `layout: cards`. Available sizes: `auto`, `tiny`, `small`, `medium`, `large`, `huge`, `full`"
+			},
+			{
+				"name": "store",
+				"type": "string|null",
+				"default": "uuid",
+				"description": "Whether to store `uuid` or `id` in the content file of the model"
+			},
+			{
+				"name": "text",
+				"type": "string|null",
+				"description": "Main text for each item"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"password": [
+			{
+				"name": "after",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown after the input"
+			},
+			{
+				"name": "autocomplete",
+				"type": "string|null",
+				"description": "Sets the HTML5 autocomplete mode for the input"
+			},
+			{
+				"name": "before",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown before the input"
+			},
+			{
+				"name": "converter",
+				"type": "string|null",
+				"description": "The field value will be converted with the selected converter before the value gets saved. Available converters: `lower`, `upper`, `ucfirst`, `slug`"
+			},
+			{
+				"name": "counter",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Shows or hides the character counter in the top right corner"
+			},
+			{
+				"name": "font",
+				"type": "string|null",
+				"default": "sans-serif",
+				"description": "Sets the font family (sans or monospace)"
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"default": "key",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "pattern",
+				"type": "string|null",
+				"description": "A regular expression, which will be used to validate the input"
+			},
+			{
+				"name": "maxlength",
+				"type": "int|null",
+				"description": "Maximum number of allowed characters"
+			},
+			{
+				"name": "minlength",
+				"type": "int|null",
+				"description": "Minimum number of required characters"
+			},
+			{
+				"name": "placeholder",
+				"type": "array|string|null",
+				"description": "Optional placeholder value that will be shown when the field is empty"
+			},
+			{
+				"name": "spellcheck",
+				"type": "bool|null",
+				"description": "If `false`, spellcheck will be switched off"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"radio": [
+			{
+				"name": "columns",
+				"type": "int|null",
+				"default": "1",
+				"description": "Arranges the inputs in the given number of columns"
+			},
+			{
+				"name": "options",
+				"type": "array|string|null",
+				"description": "An array with options"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"range": [
+			{
+				"name": "tooltip",
+				"type": "array|bool|null",
+				"default": "true"
+			},
+			{
+				"name": "after",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown after the input"
+			},
+			{
+				"name": "before",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown before the input"
+			},
+			{
+				"name": "default",
+				"type": "float|string|null",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "placeholder",
+				"type": "array|string|null",
+				"description": "Optional placeholder value that will be shown when the field is empty"
+			},
+			{
+				"name": "max",
+				"type": "float|null",
+				"default": "100",
+				"description": "The highest allowed number"
+			},
+			{
+				"name": "min",
+				"type": "float|null",
+				"description": "The lowest allowed number"
+			},
+			{
+				"name": "step",
+				"type": "float|string|null",
+				"description": "Allowed incremental steps between numbers (i.e `0.5`) Use `any` to allow any decimal value."
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"select": [
+			{
+				"name": "icon",
+				"type": "string|null",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "placeholder",
+				"type": "array|string|null",
+				"default": "—",
+				"description": "Text shown when no option is selected yet"
+			},
+			{
+				"name": "options",
+				"type": "array|string|null",
+				"description": "An array with options"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"slug": [
+			{
+				"name": "allow",
+				"type": "string|null",
+				"description": "Set of characters allowed in the slug"
+			},
+			{
+				"name": "path",
+				"type": "string|null",
+				"description": "Set prefix for the help text"
+			},
+			{
+				"name": "sync",
+				"type": "string|null",
+				"description": "Name of another field that should be used to automatically update this field's value"
+			},
+			{
+				"name": "wizard",
+				"type": "array|bool|null",
+				"default": "false",
+				"description": "Set to object with keys `field` and `text` to add button to generate from another field"
+			},
+			{
+				"name": "after",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown after the input"
+			},
+			{
+				"name": "autocomplete",
+				"type": "string|null",
+				"description": "Sets the HTML5 autocomplete mode for the input"
+			},
+			{
+				"name": "before",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown before the input"
+			},
+			{
+				"name": "converter",
+				"type": "string|null",
+				"description": "The field value will be converted with the selected converter before the value gets saved. Available converters: `lower`, `upper`, `ucfirst`, `slug`"
+			},
+			{
+				"name": "counter",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Shows or hides the character counter in the top right corner"
+			},
+			{
+				"name": "font",
+				"type": "string|null",
+				"default": "sans-serif",
+				"description": "Sets the font family (sans or monospace)"
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"default": "url",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "pattern",
+				"type": "string|null",
+				"description": "A regular expression, which will be used to validate the input"
+			},
+			{
+				"name": "maxlength",
+				"type": "int|null",
+				"description": "Maximum number of allowed characters"
+			},
+			{
+				"name": "minlength",
+				"type": "int|null",
+				"description": "Minimum number of required characters"
+			},
+			{
+				"name": "placeholder",
+				"type": "array|string|null",
+				"description": "Optional placeholder value that will be shown when the field is empty"
+			},
+			{
+				"name": "spellcheck",
+				"type": "bool|null",
+				"description": "If `false`, spellcheck will be switched off"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"stats": [
+			{
+				"name": "reports",
+				"type": "array|string|null",
+				"default": "[]",
+				"description": "Array or query string for reports. Each report needs a `label` and `value` and can have additional `info`, `link`, `icon` and `theme` settings."
+			},
+			{
+				"name": "size",
+				"type": "string|null",
+				"default": "large",
+				"description": "The size of the report cards. Available sizes: `tiny`, `small`, `medium`, `large`"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"structure": [
+			{
+				"name": "batch",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Show/hide the batch select interface"
+			},
+			{
+				"name": "columns",
+				"type": "array|null",
+				"description": "Columns definition for the table"
+			},
+			{
+				"name": "default",
+				"type": "array|null",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "duplicate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Allow duplicating items in the field"
+			},
+			{
+				"name": "empty",
+				"type": "array|string|null",
+				"description": "Sets the text for the empty state box"
+			},
+			{
+				"name": "fields",
+				"type": "array|null"
+			},
+			{
+				"name": "limit",
+				"type": "int|null",
+				"description": "The number of entries that will be displayed on a single page. Afterwards pagination kicks in."
+			},
+			{
+				"name": "max",
+				"type": "int|null",
+				"description": "Sets the maximum number of allowed items in the field"
+			},
+			{
+				"name": "min",
+				"type": "int|null",
+				"description": "Sets the minimum number of required items in the field"
+			},
+			{
+				"name": "prepend",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If activated, new items will be added at the start"
+			},
+			{
+				"name": "sortable",
+				"type": "bool|null",
+				"default": "true",
+				"description": "If `true`, entries are sortable via drag & drop"
+			},
+			{
+				"name": "sortBy",
+				"type": "string|null",
+				"description": "Sorts the entries by the given field and order (i.e. `title desc`) Drag & drop is disabled in this case"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"tags": [
+			{
+				"name": "accept",
+				"type": "string|null",
+				"default": "all",
+				"description": "If set to `all`, any type of input is accepted. If set to `options` only the predefined options are accepted as input."
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"default": "tag",
+				"description": "Icon that will be shown at the end of the field"
+			},
+			{
+				"name": "layout",
+				"type": "string|null",
+				"description": "Set to `list` to display each tag with 100% width, otherwise the tags are displayed inline"
+			},
+			{
+				"name": "search",
+				"type": "array|bool|null",
+				"default": "true",
+				"description": "Enable/disable the search in the dropdown Also limit displayed items (display: 20) and set minimum number of characters to search (min: 3)"
+			},
+			{
+				"name": "separator",
+				"type": "string|null",
+				"default": ",",
+				"description": "Custom separator, which will be used to store a list of values in the content file"
+			},
+			{
+				"name": "sort",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, selected entries will be sorted according to their position in the dropdown"
+			},
+			{
+				"name": "max",
+				"type": "int|null",
+				"description": "Sets the maximum number of allowed items in the field"
+			},
+			{
+				"name": "min",
+				"type": "int|null",
+				"description": "Sets the minimum number of required items in the field"
+			},
+			{
+				"name": "options",
+				"type": "array|string|null",
+				"description": "An array with options"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"tel": [
+			{
+				"name": "after",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown after the input"
+			},
+			{
+				"name": "autocomplete",
+				"type": "string|null",
+				"default": "tel",
+				"description": "Sets the HTML5 autocomplete mode for the input"
+			},
+			{
+				"name": "before",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown before the input"
+			},
+			{
+				"name": "converter",
+				"type": "string|null",
+				"description": "The field value will be converted with the selected converter before the value gets saved. Available converters: `lower`, `upper`, `ucfirst`, `slug`"
+			},
+			{
+				"name": "counter",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Shows or hides the character counter in the top right corner"
+			},
+			{
+				"name": "font",
+				"type": "string|null",
+				"default": "sans-serif",
+				"description": "Sets the font family (sans or monospace)"
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"default": "phone",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "pattern",
+				"type": "string|null",
+				"description": "A regular expression, which will be used to validate the input"
+			},
+			{
+				"name": "maxlength",
+				"type": "int|null",
+				"description": "Maximum number of allowed characters"
+			},
+			{
+				"name": "minlength",
+				"type": "int|null",
+				"description": "Minimum number of required characters"
+			},
+			{
+				"name": "placeholder",
+				"type": "array|string|null",
+				"description": "Optional placeholder value that will be shown when the field is empty"
+			},
+			{
+				"name": "spellcheck",
+				"type": "bool|null",
+				"description": "If `false`, spellcheck will be switched off"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"text": [
+			{
+				"name": "after",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown after the input"
+			},
+			{
+				"name": "autocomplete",
+				"type": "string|null",
+				"description": "Sets the HTML5 autocomplete mode for the input"
+			},
+			{
+				"name": "before",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown before the input"
+			},
+			{
+				"name": "converter",
+				"type": "string|null",
+				"description": "The field value will be converted with the selected converter before the value gets saved. Available converters: `lower`, `upper`, `ucfirst`, `slug`"
+			},
+			{
+				"name": "counter",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Shows or hides the character counter in the top right corner"
+			},
+			{
+				"name": "font",
+				"type": "string|null",
+				"default": "sans-serif",
+				"description": "Sets the font family (sans or monospace)"
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "pattern",
+				"type": "string|null",
+				"description": "A regular expression, which will be used to validate the input"
+			},
+			{
+				"name": "maxlength",
+				"type": "int|null",
+				"description": "Maximum number of allowed characters"
+			},
+			{
+				"name": "minlength",
+				"type": "int|null",
+				"description": "Minimum number of required characters"
+			},
+			{
+				"name": "placeholder",
+				"type": "array|string|null",
+				"description": "Optional placeholder value that will be shown when the field is empty"
+			},
+			{
+				"name": "spellcheck",
+				"type": "bool|null",
+				"description": "If `false`, spellcheck will be switched off"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"textarea": [
+			{
+				"name": "buttons",
+				"type": "array|bool|null",
+				"default": "true",
+				"description": "Enables/disables the format buttons. Can either be `true`/`false` or a list of allowed buttons. Available buttons: `headlines`, `italic`, `bold`, `link`, `email`, `file`, `code`, `ul`, `ol` (as well as `|` for a divider)"
+			},
+			{
+				"name": "counter",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Shows or hides the character counter in the top right corner"
+			},
+			{
+				"name": "files",
+				"type": "mixed",
+				"description": "Sets the options for the files picker"
+			},
+			{
+				"name": "font",
+				"type": "string|null",
+				"default": "sans-serif",
+				"description": "Sets the font family (sans or monospace)"
+			},
+			{
+				"name": "maxlength",
+				"type": "int|null",
+				"description": "Maximum number of allowed characters"
+			},
+			{
+				"name": "minlength",
+				"type": "int|null",
+				"description": "Minimum number of required characters"
+			},
+			{
+				"name": "size",
+				"type": "string|null",
+				"description": "Changes the size of the textarea. Available sizes: `small`, `medium`, `large`, `huge`"
+			},
+			{
+				"name": "spellcheck",
+				"type": "bool|null",
+				"description": "If `false`, spellcheck will be switched off"
+			},
+			{
+				"name": "uploads",
+				"type": "mixed",
+				"description": "Sets the upload options for linked files"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"time": [
+			{
+				"name": "notation",
+				"type": "int|null",
+				"default": "24",
+				"description": "`12` or `24` hour notation. If `12`, an AM/PM selector will be shown. If `display` is defined, that option will take priority."
+			},
+			{
+				"name": "display",
+				"type": "string|null",
+				"description": "Custom format (dayjs tokens: `HH`, `hh`, `mm`, `ss`, `a`) that is used to display the field in the Panel"
+			},
+			{
+				"name": "format",
+				"type": "string|null",
+				"default": "self::ISO",
+				"description": "Defines a custom format that is used when the field is saved"
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"default": "clock",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "max",
+				"type": "string|null",
+				"description": "Latest time, which can be selected/saved (H:i or H:i:s)"
+			},
+			{
+				"name": "min",
+				"type": "string|null",
+				"description": "Earliest time, which can be selected/saved (H:i or H:i:s)"
+			},
+			{
+				"name": "step",
+				"type": "array|int|string|null",
+				"default": "['size' => 5, 'unit' => 'minute']",
+				"description": "Round to the nearest: sub-options for `unit` (minute) and `size` (5)"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"toggle": [
+			{
+				"name": "after",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown after the input"
+			},
+			{
+				"name": "before",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown before the input"
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "text",
+				"type": "array|string|null",
+				"description": "Sets the text next to the toggle. The text can be a string or an array of two options. The first one is the negative text and the second one the positive. The text will automatically switch when the toggle is triggered."
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"toggles": [
+			{
+				"name": "grow",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Toggles will automatically span the full width of the field. With the grow option, you can disable this behaviour for a more compact layout."
+			},
+			{
+				"name": "labels",
+				"type": "bool|null",
+				"default": "true",
+				"description": "If `false` all labels will be hidden for icon-only toggles."
+			},
+			{
+				"name": "resettable",
+				"type": "bool|null",
+				"default": "true",
+				"description": "A toggle can be deactivated on click. If resettable is `false` deactivating a toggle is no longer possible."
+			},
+			{
+				"name": "options",
+				"type": "array|string|null",
+				"description": "An array with options"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"url": [
+			{
+				"name": "after",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown after the input"
+			},
+			{
+				"name": "autocomplete",
+				"type": "string|null",
+				"default": "url",
+				"description": "Sets the HTML5 autocomplete mode for the input"
+			},
+			{
+				"name": "before",
+				"type": "array|string|null",
+				"description": "Optional text that will be shown before the input"
+			},
+			{
+				"name": "converter",
+				"type": "string|null",
+				"description": "The field value will be converted with the selected converter before the value gets saved. Available converters: `lower`, `upper`, `ucfirst`, `slug`"
+			},
+			{
+				"name": "counter",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Shows or hides the character counter in the top right corner"
+			},
+			{
+				"name": "font",
+				"type": "string|null",
+				"default": "sans-serif",
+				"description": "Sets the font family (sans or monospace)"
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"default": "url",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "pattern",
+				"type": "string|null",
+				"description": "A regular expression, which will be used to validate the input"
+			},
+			{
+				"name": "maxlength",
+				"type": "int|null",
+				"description": "Maximum number of allowed characters"
+			},
+			{
+				"name": "minlength",
+				"type": "int|null",
+				"description": "Minimum number of required characters"
+			},
+			{
+				"name": "placeholder",
+				"type": "array|string|null",
+				"default": "https://example.com",
+				"description": "Optional placeholder value that will be shown when the field is empty"
+			},
+			{
+				"name": "spellcheck",
+				"type": "bool|null",
+				"description": "If `false`, spellcheck will be switched off"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"userpicker": [
+			{
+				"name": "empty",
+				"type": "array|string|null",
+				"description": "The placeholder text if none have been selected yet"
+			},
+			{
+				"name": "image",
+				"type": "array|null",
+				"description": "Image settings for each item"
+			},
+			{
+				"name": "info",
+				"type": "string|null",
+				"description": "Info text for each item"
+			},
+			{
+				"name": "layout",
+				"type": "string|null",
+				"default": "list",
+				"description": "Switch the layout of the items. Available layouts: `list`, `cardlets`, `cards` and `table`"
+			},
+			{
+				"name": "link",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Whether each item should be clickable"
+			},
+			{
+				"name": "max",
+				"type": "int|null",
+				"description": "Sets the maximum number of allowed items in the field"
+			},
+			{
+				"name": "min",
+				"type": "int|null",
+				"description": "Sets the minimum number of required items in the field"
+			},
+			{
+				"name": "multiple",
+				"type": "bool|null",
+				"default": "true",
+				"description": "If `false`, only a single one can be selected"
+			},
+			{
+				"name": "picker",
+				"type": "array|null",
+				"default": "[]",
+				"description": "Additional picker dialog props { image, layout, size }"
+			},
+			{
+				"name": "query",
+				"type": "string|null",
+				"description": "Query for the items to be included in the picker"
+			},
+			{
+				"name": "search",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Enable/disable the search field in the picker"
+			},
+			{
+				"name": "size",
+				"type": "string|null",
+				"default": "auto",
+				"description": "Size for `layout: cards`. Available sizes: `auto`, `tiny`, `small`, `medium`, `large`, `huge`, `full`"
+			},
+			{
+				"name": "store",
+				"type": "string|null",
+				"default": "uuid",
+				"description": "Whether to store `uuid` or `id` in the content file of the model"
+			},
+			{
+				"name": "text",
+				"type": "string|null",
+				"description": "Main text for each item"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		],
+		"writer": [
+			{
+				"name": "counter",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Shows or hides the character counter in the top right corner"
+			},
+			{
+				"name": "headings",
+				"type": "array|null",
+				"default": "[1, 2, 3, 4, 5, 6]",
+				"description": "Available heading levels"
+			},
+			{
+				"name": "inline",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Enables inline mode, which will not wrap new lines in paragraphs and creates hard breaks instead."
+			},
+			{
+				"name": "icon",
+				"type": "string|null",
+				"description": "Optional icon that will be shown at the end of the field"
+			},
+			{
+				"name": "marks",
+				"type": "array|bool|null",
+				"description": "Sets the allowed HTML formats. Available formats: `bold`, `italic`, `underline`, `strike`, `code`, `link`, `email`. Activate/deactivate them all by passing `true`/`false`. Default marks are `bold`, `italic`, `underline`, `strike`, `link`, `email`"
+			},
+			{
+				"name": "nodes",
+				"type": "array|bool|null",
+				"description": "Sets the allowed nodes. Available nodes: `paragraph`, `heading`, `bulletList`, `orderedList`, `quote`. Activate/deactivate them all by passing `true`/`false`. Default nodes are `paragraph`, `heading`, `bulletList`, `orderedList`."
+			},
+			{
+				"name": "toolbar",
+				"type": "array|bool|null",
+				"description": "Toolbar options, incl. `marks` (to narrow down which marks should have toolbar buttons), `nodes` (to narrow down which nodes should have toolbar dropdown entries) and `inline` to set the position of the toolbar (false = sticking on top of the field)"
+			},
+			{
+				"name": "maxlength",
+				"type": "int|null",
+				"description": "Maximum number of allowed characters"
+			},
+			{
+				"name": "minlength",
+				"type": "int|null",
+				"description": "Minimum number of required characters"
+			},
+			{
+				"name": "placeholder",
+				"type": "array|string|null",
+				"description": "Optional placeholder value that will be shown when the field is empty"
+			},
+			{
+				"name": "spellcheck",
+				"type": "bool|null",
+				"description": "If `false`, spellcheck will be switched off"
+			},
+			{
+				"name": "autofocus",
+				"type": "bool|null",
+				"default": "false",
+				"description": "Sets the focus on this field when the form loads. Only the first field with this label gets"
+			},
+			{
+				"name": "default",
+				"type": "mixed",
+				"description": "Default value for the field, which will be used when a page/file/user is created"
+			},
+			{
+				"name": "disabled",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field is no longer editable and will not be saved"
+			},
+			{
+				"name": "help",
+				"type": "array|string|null",
+				"description": "Optional help text below the field"
+			},
+			{
+				"name": "label",
+				"type": "array|string|null",
+				"description": "The field label can be set as string or associative array with translations"
+			},
+			{
+				"name": "required",
+				"type": "bool|null",
+				"default": "false",
+				"description": "If `true`, the field has to be filled in correctly to be saved."
+			},
+			{
+				"name": "translate",
+				"type": "bool|null",
+				"default": "true",
+				"description": "Should the field be translatable?"
+			},
+			{
+				"name": "when",
+				"type": "array|null",
+				"description": "Conditions when the field will be shown"
+			},
+			{
+				"name": "width",
+				"type": "string|null",
+				"default": "1/1",
+				"description": "The width of the field in the field grid. Available widths: `1/1`, `1/2`, `1/3`, `1/4`, `2/3`, `3/4`"
+			}
+		]
+	}
+}

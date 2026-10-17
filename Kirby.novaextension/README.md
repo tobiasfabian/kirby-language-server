@@ -17,6 +17,7 @@ File paths in `hashedUrl('`, `asset('`, `svg('`, `css('`, `js('` and `url('asset
 In blueprints:
 
 - `type: ` offers Kirby 6's field types, such as `pagelist` and `pagepicker`. `pages`, `files` and `users` are shown as deprecated aliases.
+- At a key of a field, the options of its type are offered, with their type, default and description: `counter`, `maxlength` … for a `text` field, `templates`, `layout` … for a `pagelist`. Options the field already has are left out.
 - Template names in `template:`/`templates:`/`create:` of a `pagelist`, `template:` of a `filelist`, `uploads:` of a `filepicker` or `textarea` and `options: changeTemplate:` offer the page (or file) templates: from blueprints, `site/templates`, plugins, and the pages in the content folder. Templates that don't exist anywhere are marked; for file templates without a blueprint it's only a hint, because Kirby falls back to `files/default`.
 - `extends: ` and the shorthand `seo: fields/seo` (in `fields`, `tabs` and `sections`) offer the project's blueprints, those of the fitting folder first. Blueprints that don't exist are marked; `intro: textarea` too, because Kirby reads it as `extends` and not as the type. ⌃⌥⌘O opens the blueprint.
 
