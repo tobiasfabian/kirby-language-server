@@ -13,7 +13,7 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { fieldTypes, typeContext } from './blueprints.js';
 import { completionContext, findCalls, nameAt, propsContext } from './calls.js';
-import { collectionSignature, findSites, listCollections, listSnippets, listTranslations, snippetProps, snippetVariables } from './project.js';
+import { collectionSignature, findAsset, findSites, listCollections, listDocroot, listSnippets, listTranslations, snippetProps, snippetVariables } from './project.js';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -101,6 +101,47 @@ function typeCompletion(document, position) {
 }
 
 /**
+ * Completion for a path in `css('…')`, `svg('…')` etc.: the files and folders
+ * in the folder typed so far, relative to the docroot
+ * @param {TextDocument} document
+ * @param {{ line: number, character: number }} position
+ * @param {string} site
+ * @param {{ fn: string, prefix: string, start: number }} context
+ */
+function assetCompletion(document, position, site, context) {
+	const slash = context.prefix.lastIndexOf('/');
+	const folder = context.prefix.slice(0, slash + 1).replace(/^\//, '');
+
+	// url() is only about files in assets/
+	if (context.fn === 'url' && folder.startsWith('assets/') === false && folder !== '') {
+		return [];
+	}
+
+	const range = { start: document.positionAt(context.start + slash + 1), end: position };
+
+	return listDocroot(site, folder)
+		.filter(({ name }) => context.fn !== 'url' || folder !== '' || name === 'assets')
+		.map(({ name, directory }) => ({
+			label: directory ? name + '/' : name,
+			kind: directory ? CompletionItemKind.Folder : CompletionItemKind.File,
+			filterText: name,
+			sortText: (directory ? '0' : '1') + name,
+			textEdit: { range, newText: directory ? name + '/' : name },
+		}));
+}
+
+/**
+ * The file a path in `css('…')`, `svg('…')` etc. points to, as an entry
+ * @param {string} site
+ * @param {string} name
+ * @returns {import('./project.js').Entry | undefined}
+ */
+function assetEntry(site, name) {
+	const asset = findAsset(site, name);
+	return asset === null || asset.directory === true ? undefined : { file: asset.file, line: 0, source: 'site' };
+}
+
+/**
  * The translation keys of a site, with their texts per language
  * @param {string} site
  */
@@ -163,13 +204,17 @@ function origin(entry, site) {
 
 /**
  * Markdown for a snippet or collection: its origin and what it expects or returns
- * @param {'snippet' | 'collection'} kind
+ * @param {import('./calls.js').Kind} kind
  * @param {string} name
  * @param {import('./project.js').Entry} entry
  * @param {string} site
  */
 function describe(kind, name, entry, site) {
 	const lines = [`**${name}** · ${origin(entry, site)}`];
+
+	if (kind === 'asset') {
+		return lines.join('\n');
+	}
 
 	if (kind === 'translation') {
 		lines.push('', ...textsOf(entry, site).map(([language, text]) => `- ${language}: ${text || '(empty)'}`));
@@ -194,13 +239,13 @@ function lookup(textDocument, position) {
 	const document = documents.get(textDocument.uri);
 	const site = document ? siteFor(document.uri) : null;
 	const name = site ? nameAt(document.getText(), document.offsetAt(position)) : null;
-	const entry = name ? entriesOf(site, name.kind).get(name.name) : undefined;
+	const entry = name === null ? undefined : name.kind === 'asset' ? assetEntry(site, name.name) : entriesOf(site, name.kind).get(name.name);
 
 	return entry === undefined ? null : { document, site, name, entry };
 }
 
 /**
- * Warns about calls whose snippet or collection doesn't exist
+ * Warns about calls whose snippet, collection, translation or file doesn't exist
  * @param {TextDocument} document
  */
 function validate(document) {
@@ -214,10 +259,12 @@ function validate(document) {
 	const diagnostics = [];
 
 	for (const call of findCalls(document.getText())) {
-		const entries = entriesOf(site, call.kind);
 		let severity = DiagnosticSeverity.Warning;
+		const exists = call.kind === 'asset'
+			? findAsset(site, call.names[0].name) !== null
+			: call.names.some(({ name }) => entriesOf(site, call.kind).has(name));
 
-		if (call.names.some(({ name }) => entries.has(name)) === true) {
+		if (exists === true) {
 			continue;
 		}
 
@@ -241,6 +288,8 @@ function validate(document) {
 			}
 		} else if (call.kind === 'collection') {
 			message = `Collection ${list} not found. collection() returns null.`;
+		} else if (call.kind === 'asset') {
+			message = `File ${list} not found.`;
 		} else {
 			message = call.names.length === 1 ? `Snippet ${list} not found. Kirby renders nothing.` : `None of the snippets ${list} exist. Kirby renders nothing.`;
 		}
@@ -331,6 +380,10 @@ connection.onCompletion(({ textDocument, position }) => {
 		return [];
 	}
 
+	if (context.kind === 'asset') {
+		return assetCompletion(document, position, site, context);
+	}
+
 	const range = { start: document.positionAt(context.start), end: position };
 
 	return [...entriesOf(site, context.kind)].map(([name, entry]) => ({
@@ -393,7 +446,7 @@ connection.onCodeLens(({ textDocument }) => {
 		return [];
 	}
 
-	return findCalls(document.getText()).filter((call) => call.kind !== 'translation').flatMap((call) => {
+	return findCalls(document.getText()).filter((call) => call.kind === 'snippet' || call.kind === 'collection').flatMap((call) => {
 		const entries = entriesOf(site, call.kind);
 		const found = call.names.map(({ name }) => entries.get(name)).find((entry) => entry !== undefined);
 
@@ -413,7 +466,7 @@ connection.onCodeLens(({ textDocument }) => {
 documents.onDidOpen(({ document }) => validate(document));
 documents.onDidChangeContent(({ document }) => scheduleValidation(document));
 
-// A saved file may be a new snippet or collection, so check all open documents again
+// A saved file may be a new snippet, collection or asset, so check all open documents again
 documents.onDidSave(() => {
 	cache.clear();
 	documents.all().forEach(validate);

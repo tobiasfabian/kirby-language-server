@@ -537,3 +537,65 @@ export function snippetVariables(file) {
 
 	return [...variables.values()];
 }
+
+// Folders in the docroot that hold no files for the browser, or files Kirby creates on demand
+const NOT_ASSETS = new Set(['content', 'kirby', 'media', 'node_modules', 'site', 'vendor']);
+
+/**
+ * The docroot: the folder of the `index.php` that starts Kirby. Usually the folder around `site`;
+ * with custom roots (`'site' => __DIR__ . '/../site'`) a folder like `public` next to `site`.
+ * @param {string} site
+ */
+export function findDocroot(site) {
+	const project = path.dirname(site);
+
+	if (fs.existsSync(path.join(project, 'index.php')) === true) {
+		return project;
+	}
+
+	for (const entry of fs.readdirSync(project, { withFileTypes: true })) {
+		if (entry.isDirectory() === true && SKIP.has(entry.name) === false && /\bkirby\b/i.test(read(path.join(project, entry.name, 'index.php')) ?? '') === true) {
+			return path.join(project, entry.name);
+		}
+	}
+
+	return project;
+}
+
+/**
+ * The files and folders in a folder of the docroot, for completing paths.
+ * Hidden files, PHP files and folders like `content` and `media` are left out.
+ * @param {string} site
+ * @param {string} folder relative to the docroot, e.g. `assets/css/`
+ * @returns {{ name: string, directory: boolean }[]}
+ */
+export function listDocroot(site, folder) {
+	if (NOT_ASSETS.has(folder.split('/')[0]) === true) {
+		return [];
+	}
+
+	try {
+		return fs.readdirSync(path.join(findDocroot(site), folder), { withFileTypes: true })
+			.filter((entry) => entry.name.startsWith('.') === false && entry.name.endsWith('.php') === false)
+			.filter((entry) => folder !== '' || NOT_ASSETS.has(entry.name) === false)
+			.map((entry) => ({ name: entry.name, directory: entry.isDirectory() }));
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * The file or folder a path in `css()`, `svg()` etc. points to, if it exists
+ * @param {string} site
+ * @param {string} name relative to the docroot, maybe with a leading `/`
+ * @returns {{ file: string, directory: boolean } | null}
+ */
+export function findAsset(site, name) {
+	const file = path.join(findDocroot(site), name.replace(/^\//, ''));
+
+	try {
+		return { file, directory: fs.statSync(file).isDirectory() };
+	} catch {
+		return null;
+	}
+}

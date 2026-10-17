@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { collectionSignature, findSites, listCollections, listSnippets, listTranslations, snippetProps, snippetVariables } from '../src/project.js';
+import { collectionSignature, findAsset, findDocroot, findSites, listCollections, listDocroot, listSnippets, listTranslations, snippetProps, snippetVariables } from '../src/project.js';
 
 const project = fileURLToPath(new URL('./fixtures/project', import.meta.url));
 const site = path.join(project, 'public', 'site');
@@ -86,4 +88,30 @@ test('reads a snippet’s variables with type and default', () => {
 		{ name: 'size', default: '\'medium\'' },
 	]);
 	assert.deepEqual(snippetVariables(path.join(site, 'snippets', 'o-header.php')), [{ name: 'variant', default: 'null' }]);
+});
+
+test('finds the docroot', (t) => {
+	assert.equal(findDocroot(site), path.join(project, 'public'));
+
+	// Custom roots: site/ next to public/index.php
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kirby-'));
+	t.after(() => fs.rmSync(root, { recursive: true }));
+	fs.mkdirSync(path.join(root, 'site'));
+	fs.mkdirSync(path.join(root, 'public'));
+	fs.writeFileSync(path.join(root, 'public', 'index.php'), `<?php\ninclude '../kirby/bootstrap.php';\n`);
+	assert.equal(findDocroot(path.join(root, 'site')), path.join(root, 'public'));
+});
+
+test('lists files in the docroot', () => {
+	assert.deepEqual(listDocroot(site, '').map(({ name }) => name), ['assets']);
+	assert.deepEqual(listDocroot(site, 'assets/images/'), [{ name: 'logo.svg', directory: false }, { name: 'monkey@2x.webp', directory: false }]);
+	assert.deepEqual(listDocroot(site, 'media/plugins/'), []);
+	assert.deepEqual(listDocroot(site, 'site/'), []);
+	assert.deepEqual(listDocroot(site, 'missing/'), []);
+});
+
+test('finds files in the docroot', () => {
+	assert.equal(findAsset(site, '/assets/css/index.css')?.directory, false);
+	assert.equal(findAsset(site, 'assets/css')?.directory, true);
+	assert.equal(findAsset(site, 'assets/css/missing.css'), null);
 });

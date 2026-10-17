@@ -19,4 +19,11 @@
 	<?= t('missing.key') ?>
 	<?= t('missing.with.fallback', 'Fallback') ?>
 	<?= tc('missing.plural', 2) ?>
+	<link rel="stylesheet" href="<?= hashedUrl('assets/css/index.css') ?>">
+	<?= svg('/assets/images/logo.svg') ?>
+	<img src="<?= url('assets/images/monkey@2x.webp') ?>" alt="">
+	<?= css('media/plugins/index.css') ?>
+	<?= js('@auto') ?>
+	<a href="<?= url('search') ?>"></a>
+	<?= svg('assets/images/missing.svg') ?>
 </body>

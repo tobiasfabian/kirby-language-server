@@ -34,6 +34,20 @@ test('finds translation keys', () => {
 	assert.deepEqual(names(`print('x'); count($a); format('y')`), []);
 });
 
+test('finds file paths in the docroot', () => {
+	assert.deepEqual(names(`<?= hashedUrl('assets/css/index.css') ?>`), [['asset', 'assets/css/index.css']]);
+	assert.deepEqual(names(`<?= svg('/assets/images/logo.svg') ?> <?= asset('assets/images/monkey@2x.webp')->url() ?>`), [['asset', '/assets/images/logo.svg'], ['asset', 'assets/images/monkey@2x.webp']]);
+	assert.deepEqual(names(`<?= css('assets/css/print.css', 'print') ?> <?= js('assets/js/index.js', ['type' => 'module']) ?>`), [['asset', 'assets/css/print.css'], ['asset', 'assets/js/index.js']]);
+	assert.deepEqual(names(`<?= url('assets/images/logo.svg') ?>`), [['asset', 'assets/images/logo.svg']]);
+});
+
+test('ignores URLs and generated files', () => {
+	assert.deepEqual(names(`<?= css('@auto') ?> <?= js('https://example.com/a.js') ?> <?= css('//example.com/a.css') ?>`), []);
+	assert.deepEqual(names(`<?= css('media/plugins/index.css') ?>`), []);
+	assert.deepEqual(names(`<?= url('search') ?> <?= url('page://abc') ?> <?= $page->url('de') ?> <?= url('sitemap.xml') ?>`), []);
+	assert.deepEqual(names(`<?= svg('assets/images/symbol-' . $name . '.svg') ?>`), []);
+});
+
 test('ignores names built at runtime', () => {
 	assert.deepEqual(names(`snippet('blocks/' . $block->type())`), []);
 	assert.deepEqual(names(`snippet($name)`), []);
@@ -54,22 +68,25 @@ test('returns the name offsets', () => {
 
 test('detects the cursor inside a name', () => {
 	const text = `<?php snippet('m-ca`;
-	assert.deepEqual(completionContext(text, text.length), { kind: 'snippet', prefix: 'm-ca', start: text.length - 4 });
+	assert.deepEqual(completionContext(text, text.length), { kind: 'snippet', fn: 'snippet', prefix: 'm-ca', start: text.length - 4 });
 
 	const empty = `<?php snippet('`;
-	assert.deepEqual(completionContext(empty, empty.length), { kind: 'snippet', prefix: '', start: empty.length });
+	assert.deepEqual(completionContext(empty, empty.length), { kind: 'snippet', fn: 'snippet', prefix: '', start: empty.length });
 
 	const list = `<?php snippet(['m-card-project', 'blocks/`;
 	assert.equal(completionContext(list, list.length)?.prefix, 'blocks/');
 
 	const collection = `<?php collection('pro`;
-	assert.deepEqual(completionContext(collection, collection.length), { kind: 'collection', prefix: 'pro', start: collection.length - 3 });
+	assert.deepEqual(completionContext(collection, collection.length), { kind: 'collection', fn: 'collection', prefix: 'pro', start: collection.length - 3 });
 
 	const query = `query: kirby.collection("`;
 	assert.equal(completionContext(query, query.length)?.kind, 'collection');
 
 	const translation = `<?= t('project.`;
-	assert.deepEqual(completionContext(translation, translation.length), { kind: 'translation', prefix: 'project.', start: translation.length - 8 });
+	assert.deepEqual(completionContext(translation, translation.length), { kind: 'translation', fn: 't', prefix: 'project.', start: translation.length - 8 });
+
+	const asset = `<?= hashedUrl('/assets/c`;
+	assert.deepEqual(completionContext(asset, asset.length), { kind: 'asset', fn: 'hashedUrl', prefix: '/assets/c', start: asset.length - 9 });
 });
 
 test('offers nothing outside names', () => {

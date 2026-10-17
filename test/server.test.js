@@ -31,10 +31,7 @@ function request(method, params) {
 	send({ id, method, params });
 
 	return new Promise((resolve, reject) => {
-		pending.set(id, resolve);
-
-		// Fail instead of waiting forever when the server dies
-		child.once('exit', (code) => reject(new Error(`Server exited with ${code}`)));
+		pending.set(id, { resolve, reject });
 	});
 }
 
@@ -58,7 +55,7 @@ function onData(chunk) {
 		buffer = buffer.subarray(headerEnd + 4 + length);
 
 		if (message.id !== undefined && pending.has(message.id)) {
-			pending.get(message.id)(message.result);
+			pending.get(message.id).resolve(message.result);
 			pending.delete(message.id);
 		} else if (message.method !== undefined) {
 			notifications.push(message);
@@ -75,6 +72,9 @@ function positionOf(needle, shift = 0) {
 before(async () => {
 	child = spawn(process.execPath, [server, '--stdio']);
 	child.stdout.on('data', onData);
+
+	// Fail instead of waiting forever when the server dies
+	child.on('exit', (code) => pending.forEach(({ reject }) => reject(new Error(`Server exited with ${code}`))));
 
 	await request('initialize', {
 		processId: process.pid,
@@ -194,12 +194,13 @@ test('jumps to the translation in the default language', async () => {
 test('warns about missing snippets, collections and translations', async () => {
 	const messages = await diagnosticsOf(templateUri);
 
-	assert.equal(messages.length, 5);
+	assert.equal(messages.length, 6);
 	assert.match(messages[0], /Snippet “head” not found/);
 	assert.match(messages[1], /Snippet “m-nav-footer” not found/);
 	assert.match(messages[2], /Collection “missing” not found/);
 	assert.match(messages[3], /Translation “missing.key” not found/);
 	assert.match(messages[4], /Translation “missing.plural” not found/);
+	assert.match(messages[5], /File “assets\/images\/missing.svg” not found/);
 });
 
 test('checks collections in blueprint queries', async () => {
@@ -238,4 +239,27 @@ test('completes the variables a snippet expects', async () => {
 	assert.deepEqual(items.map((item) => item.label), ['page', 'size']);
 	assert.equal(items[1].detail, '= \'medium\'');
 	assert.equal(items[1].textEdit.newText, 'size');
+});
+
+test('completes file paths in the docroot', async () => {
+	const position = positionOf(`hashedUrl('assets/css`, `hashedUrl('assets/`.length);
+	const items = await request('textDocument/completion', { textDocument: { uri: templateUri }, position });
+
+	assert.deepEqual(items.map((item) => item.label), ['css/', 'images/']);
+	assert.equal(items[0].textEdit.range.start.character, position.character);
+
+	const top = await request('textDocument/completion', { textDocument: { uri: templateUri }, position: positionOf(`hashedUrl('`, `hashedUrl('`.length) });
+	assert.deepEqual(top.map((item) => item.label), ['assets/']);
+
+	const url = await request('textDocument/completion', { textDocument: { uri: templateUri }, position: positionOf(`url('search`, `url('`.length) });
+	assert.deepEqual(url.map((item) => item.label), ['assets/']);
+});
+
+test('jumps to a file in the docroot', async () => {
+	const [link] = await request('textDocument/definition', {
+		textDocument: { uri: templateUri },
+		position: positionOf(`logo.svg`, 2),
+	});
+
+	assert.equal(fileURLToPath(link.targetUri), `${project}/public/assets/images/logo.svg`);
 });

@@ -10,12 +10,13 @@ For `snippet('…')`, `collection('…')` and `t('…')`/`tt('…')`/`tc('…')`
 	- translation keys from `site/languages`, plugins and the config, then Kirby's own from `kirby/i18n/translations`, with their text in each language
 - **Completion of `type:`** in blueprints: Kirby 6 field types, with `pages`, `files` and `users` as deprecated aliases (`src/blueprints.js`)
 - **Snippet variables**: in `snippet('m-card', ['…` the keys the snippet expects, with type and default
+- **File paths** in `hashedUrl('…')`, `asset('…')`, `svg('…')`, `css('…')`, `js('…')` and `url('assets/…')`: completion of the files and folders in the docroot (the folder of Kirby's `index.php`), a warning if the file doesn't exist. URLs, `@auto` and files in `media/` aren't checked.
 - **Jump to Definition** to the file (or the line of a collection defined as a closure, or of a translation key)
 - **Hover** with the same information as the completion
 - **Code lenses** with each snippet's or collection's origin above its line (not shown in Nova)
-- **Warnings** for snippets, collections and translation keys that don't exist. `t('key', 'Fallback')` isn't flagged, and Kirby's own keys (`t('save')`) are known. If a plugin loads translations at runtime, missing keys are only a hint.
+- **Warnings** for snippets, collections, translation keys and files that don't exist. `t('key', 'Fallback')` isn't flagged, and Kirby's own keys (`t('save')`) are known. If a plugin loads translations at runtime, missing keys are only a hint.
 
-In Nova, Jump to Definition is the command **Open Snippet, Collection or Translation** (⌃⌥⌘O). While Nova's built-in PHP language server (Intelephense) is on, Nova asks only that server for hover and ⌘-click. Without it, hover works but ⌘-click still doesn't jump; code lenses never appear. The completion list shows the same information as the hover.
+In Nova, Jump to Definition is the command **Open Referenced File** (⌃⌥⌘O). While Nova's built-in PHP language server (Intelephense) is on, Nova asks only that server for hover and ⌘-click. Without it, hover works but ⌘-click still doesn't jump; code lenses never appear. The completion list shows the same information as the hover.
 
 The server reads the project's files; it doesn't start Kirby. It finds the `site` folder within three levels of the project root (`site/`, `public/site/` …).
 
@@ -40,9 +41,9 @@ The extension needs Node.js 18 or newer. It looks for `node` through the login s
 ```
 src/
 ├── blueprints.js positions in blueprints, field types for type:
-├── calls.js      finds snippet() and collection() calls
+├── calls.js      finds snippet(), collection(), t() calls and file paths
 ├── php.js        reads what plugins and the config register
-├── project.js    reads snippets, collections and translations from the project
+├── project.js    reads snippets, collections, translations and the docroot from the project
 └── server.js     the language server
 Kirby.novaextension/
 ├── extension.json

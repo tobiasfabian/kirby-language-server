@@ -1,19 +1,49 @@
 /**
- * Finds `snippet()`, `collection()` and translation calls (`t()`, `tt()`, `tc()`)
+ * Finds `snippet()`, `collection()`, translation calls (`t()`, `tt()`, `tc()`)
+ * and file paths (`hashedUrl()`, `url()`, `asset()`, `svg()`, `css()`, `js()`)
  * in PHP code and blueprints.
  *
  * Only literal names count: `snippet('m-card')`, the fallback form
  * `snippet(['m-card-project', 'm-card'])`, `collection('projects')`
- * (also `$kirby->collection('…')` and `kirby.collection("…")` in queries)
- * and `t('project.completed')`.
+ * (also `$kirby->collection('…')` and `kirby.collection("…")` in queries),
+ * `t('project.completed')` and `svg('assets/images/logo.svg')`.
  * Names built at runtime, like `snippet('blocks/' . $block->type())`, are left alone.
  */
 
-/** @typedef {'snippet' | 'collection' | 'translation'} Kind */
+/** @typedef {'snippet' | 'collection' | 'translation' | 'asset'} Kind */
 
-const CALL = /\b(snippet|collection|t|tt|tc)\(\s*/g;
-const NAME_CHARACTERS = /[\w./:-]/;
-const KINDS = { snippet: 'snippet', collection: 'collection', t: 'translation', tt: 'translation', tc: 'translation' };
+const CALL = /\b(snippet|collection|t|tt|tc|hashedUrl|url|asset|svg|css|js)\(\s*/g;
+const NAME_CHARACTERS = /[\w./:@-]/;
+const KINDS = {
+	snippet: 'snippet',
+	collection: 'collection',
+	t: 'translation',
+	tt: 'translation',
+	tc: 'translation',
+	// Paths to files in the docroot
+	hashedUrl: 'asset',
+	url: 'asset',
+	asset: 'asset',
+	svg: 'asset',
+	css: 'asset',
+	js: 'asset',
+};
+
+/**
+ * Whether the path of a file call can be checked: not a URL or `@auto`,
+ * not in `media/` (Kirby creates those files on demand), and for `url()` only in `assets/`
+ * @param {string} fn
+ * @param {string} name
+ */
+function isFilePath(fn, name) {
+	const file = name.replace(/^\//, '');
+
+	if (/^[\w-]+:|^\/\/|^@/.test(name) === true || file.startsWith('media/') === true) {
+		return false;
+	}
+
+	return fn !== 'url' || file.startsWith('assets/');
+}
 
 /**
  * Reads a quoted name starting at `index`. Returns null if there is none.
@@ -99,7 +129,7 @@ export function findCalls(text) {
 		} else {
 			const name = readName(text, index);
 
-			if (name === null) {
+			if (name === null || (kind === 'asset' && isFilePath(fn, name.name) === false)) {
 				continue;
 			}
 
@@ -123,13 +153,14 @@ export function findCalls(text) {
  * the part before the cursor and where it starts
  * @param {string} text
  * @param {number} offset
- * @returns {{ kind: Kind, prefix: string, start: number } | null}
+ * @returns {{ kind: Kind, fn: string, prefix: string, start: number } | null}
  */
 export function completionContext(text, offset) {
 	const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
 	const before = text.slice(lineStart, offset);
 	const match = before.match(/\bsnippet\(\s*(?:\[\s*(?:(['"])[\w./-]*\1\s*,\s*)*)?(['"])([\w./-]*)$/)
-		?? before.match(/\b(collection|t|tt|tc)\(\s*(['"])([\w./:-]*)$/);
+		?? before.match(/\b(collection|t|tt|tc)\(\s*(['"])([\w./:-]*)$/)
+		?? before.match(/\b(hashedUrl|url|asset|svg|css|js)\(\s*(['"])([\w./@-]*)$/);
 
 	if (match === null) {
 		return null;
@@ -137,7 +168,9 @@ export function completionContext(text, offset) {
 
 	const prefix = match[3];
 
-	return { kind: KINDS[match[1]] ?? 'snippet', prefix, start: offset - prefix.length };
+	const fn = KINDS[match[1]] === undefined ? 'snippet' : match[1];
+
+	return { kind: KINDS[fn], fn, prefix, start: offset - prefix.length };
 }
 
 /**
