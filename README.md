@@ -9,12 +9,13 @@ For `snippet('…')`, `collection('…')` and `t('…')`/`tt('…')`/`tc('…')`
 	- collections from `site/collections`, plugins and `'extensions'` in the config, with their signature
 	- translation keys from `site/languages`, plugins and the config, then Kirby's own from `kirby/i18n/translations`, with their text in each language
 - **Completion of `type:`** in blueprints: Kirby 6 field types, with `pages`, `files` and `users` as deprecated aliases (`src/blueprints.js`)
+- **`extends:`** in blueprints, and the shorthand `seo: fields/seo` in `fields`, `tabs` and `sections`: completion of the blueprints from `site/blueprints`, plugins, the config and Kirby (those of the fitting folder first), a warning if the blueprint doesn't exist (only a hint if a plugin registers blueprints in a way that can't be read), Jump to Definition and hover. `intro: textarea` is flagged too: Kirby reads it as `extends`, not as the type.
 - **Snippet variables**: in `snippet('m-card', ['…` the keys the snippet expects, with type and default
 - **File paths** in `hashedUrl('…')`, `asset('…')`, `svg('…')`, `css('…')`, `js('…')` and `url('assets/…')`: completion of the files and folders in the docroot (the folder of Kirby's `index.php`), a warning if the file doesn't exist. URLs, `@auto` and files in `media/` aren't checked.
 - **Jump to Definition** to the file (or the line of a collection defined as a closure, or of a translation key)
 - **Hover** with the same information as the completion
 - **Code lenses** with each snippet's or collection's origin above its line (not shown in Nova)
-- **Warnings** for snippets, collections, translation keys and files that don't exist. `t('key', 'Fallback')` isn't flagged, and Kirby's own keys (`t('save')`) are known. If a plugin loads translations at runtime, missing keys are only a hint.
+- **Warnings** for snippets, collections, translation keys, files and blueprints that don't exist. `t('key', 'Fallback')` isn't flagged, and Kirby's own keys (`t('save')`) are known. If a plugin loads translations at runtime, missing keys are only a hint.
 
 In Nova, Jump to Definition is the command **Open Referenced File** (⌃⌥⌘O). While Nova's built-in PHP language server (Intelephense) is on, Nova asks only that server for hover and ⌘-click. Without it, hover works but ⌘-click still doesn't jump; code lenses never appear. The completion list shows the same information as the hover.
 
@@ -61,6 +62,6 @@ The same pattern (read the project, complete, jump, warn) fits more of Kirby:
 - thumb presets in `->thumb('…')` and `->srcset('…')`
 - translation keys missing in some of the languages
 - `option('…')`
-- template names and `extends: fields/…` in blueprints
+- template names in blueprints
 - field types registered by plugins
 - site methods from `*-methods.stub.php`

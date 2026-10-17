@@ -13,7 +13,8 @@
 	],
 	"main": "main.js",
 	"activationEvents": [
-		"onLanguage:php"
+		"onLanguage:php",
+		"onLanguage:yaml"
 	],
 	"entitlements": {
 		"process": true

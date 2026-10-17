@@ -11,9 +11,9 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { fieldTypes, typeContext } from './blueprints.js';
+import { blueprintReferences, extendsContext, fieldTypes, isFieldType, referenceAt, typeContext } from './blueprints.js';
 import { completionContext, findCalls, nameAt, propsContext } from './calls.js';
-import { collectionSignature, findAsset, findSites, listCollections, listDocroot, listSnippets, listTranslations, snippetProps, snippetVariables } from './project.js';
+import { collectionSignature, findAsset, findSites, listBlueprints, listCollections, listDocroot, listSnippets, listTranslations, snippetProps, snippetVariables } from './project.js';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -142,6 +142,46 @@ function assetEntry(site, name) {
 }
 
 /**
+ * Completion for a blueprint name after `extends:` or in the shorthand `seo: fields/seo`.
+ * Blueprints of the folder that fits (e.g. `fields/` for a field) come first.
+ * @param {TextDocument} document
+ * @param {{ line: number, character: number }} position
+ * @param {string} site
+ */
+function extendsCompletion(document, position, site) {
+	const context = extendsContext(document.getText(), document.offsetAt(position));
+
+	if (context === null) {
+		return null;
+	}
+
+	const blueprints = entriesOf(site, 'blueprint');
+	const range = { start: document.positionAt(context.start), end: position };
+
+	// At the top of a blueprint, its own folder fits: pages/… in pages/project.yml
+	const file = fileURLToPath(document.uri);
+	const own = [...blueprints].find(([, entry]) => entry.file === file)?.[0];
+	const folder = context.folder ?? (own?.includes('/') ? own.split('/')[0] : null);
+
+	return [...blueprints].map(([name, entry]) => ({
+		label: name,
+		kind: CompletionItemKind.File,
+		detail: origin(entry, site),
+		filterText: name,
+		sortText: (name.startsWith(folder + '/') ? '0' : '1') + (entry.source === 'kirby' ? '1' : '0') + name,
+		textEdit: { range, newText: name },
+	}));
+}
+
+/**
+ * The blueprints of a site, and whether all of them could be read
+ * @param {string} site
+ */
+function blueprintsOf(site) {
+	return cached('blueprints:' + site, () => listBlueprints(site));
+}
+
+/**
  * The translation keys of a site, with their texts per language
  * @param {string} site
  */
@@ -162,6 +202,10 @@ function entriesOf(site, kind) {
 			const { translations, kirby } = translationsOf(site);
 			return new Map([...kirby, ...translations]);
 		});
+	}
+
+	if (kind === 'blueprint') {
+		return blueprintsOf(site).blueprints;
 	}
 
 	return cached(kind + ':' + site, () => kind === 'snippet' ? listSnippets(site) : listCollections(site));
@@ -204,7 +248,7 @@ function origin(entry, site) {
 
 /**
  * Markdown for a snippet or collection: its origin and what it expects or returns
- * @param {import('./calls.js').Kind} kind
+ * @param {import('./calls.js').Kind | 'blueprint'} kind
  * @param {string} name
  * @param {import('./project.js').Entry} entry
  * @param {string} site
@@ -212,7 +256,7 @@ function origin(entry, site) {
 function describe(kind, name, entry, site) {
 	const lines = [`**${name}** · ${origin(entry, site)}`];
 
-	if (kind === 'asset') {
+	if (kind === 'asset' || kind === 'blueprint') {
 		return lines.join('\n');
 	}
 
@@ -238,14 +282,55 @@ function describe(kind, name, entry, site) {
 function lookup(textDocument, position) {
 	const document = documents.get(textDocument.uri);
 	const site = document ? siteFor(document.uri) : null;
-	const name = site ? nameAt(document.getText(), document.offsetAt(position)) : null;
+	const offset = document?.offsetAt(position);
+	const reference = site && isBlueprint(document) ? referenceAt(document.getText(), offset) : null;
+	const name = site === null ? null : reference === null ? nameAt(document.getText(), offset) : { kind: 'blueprint', ...reference };
 	const entry = name === null ? undefined : name.kind === 'asset' ? assetEntry(site, name.name) : entriesOf(site, name.kind).get(name.name);
 
 	return entry === undefined ? null : { document, site, name, entry };
 }
 
 /**
- * Warns about calls whose snippet, collection, translation or file doesn't exist
+ * Whether a document is a blueprint (a YAML file)
+ * @param {TextDocument} document
+ */
+function isBlueprint(document) {
+	return /\.ya?ml$/.test(document.uri);
+}
+
+/**
+ * Warns about blueprints that `extends` or the shorthand `seo: fields/seo` refer to and that don't exist
+ * @param {TextDocument} document
+ * @param {string} site
+ */
+function blueprintDiagnostics(document, site) {
+	const { blueprints, complete } = blueprintsOf(site);
+
+	return blueprintReferences(document.getText()).filter(({ name }) => blueprints.has(name) === false).map((reference) => {
+		let message = `Blueprint “${reference.name}” not found. Kirby ignores it.`;
+
+		// `intro: textarea` isn't a type shorthand; Kirby takes the field name as type
+		if (reference.shorthand === true && isFieldType(reference.name) === true) {
+			message += ` For a field type, use “type: ${reference.name}”.`;
+		}
+
+		// A plugin we couldn't read may register it
+		if (complete === false) {
+			message += ' (Some plugins register blueprints in a way that couldn’t be read.)';
+		}
+
+		return {
+			severity: complete === true ? DiagnosticSeverity.Warning : DiagnosticSeverity.Information,
+			range: { start: document.positionAt(reference.start), end: document.positionAt(reference.end) },
+			message,
+			source: 'Kirby',
+		};
+	});
+}
+
+/**
+ * Warns about calls whose snippet, collection, translation or file doesn't exist,
+ * and in blueprints about missing blueprints
  * @param {TextDocument} document
  */
 function validate(document) {
@@ -305,6 +390,10 @@ function validate(document) {
 		});
 	}
 
+	if (isBlueprint(document) === true) {
+		diagnostics.push(...blueprintDiagnostics(document, site));
+	}
+
 	connection.sendDiagnostics({ uri: document.uri, diagnostics });
 }
 
@@ -347,11 +436,11 @@ connection.onCompletion(({ textDocument, position }) => {
 	const document = documents.get(textDocument.uri);
 	const site = document ? siteFor(document.uri) : null;
 
-	if (site !== null && /\.ya?ml$/.test(document.uri)) {
-		const types = typeCompletion(document, position);
+	if (site !== null && isBlueprint(document) === true) {
+		const items = typeCompletion(document, position) ?? extendsCompletion(document, position, site);
 
-		if (types !== null) {
-			return types;
+		if (items !== null) {
+			return items;
 		}
 	}
 
@@ -466,7 +555,7 @@ connection.onCodeLens(({ textDocument }) => {
 documents.onDidOpen(({ document }) => validate(document));
 documents.onDidChangeContent(({ document }) => scheduleValidation(document));
 
-// A saved file may be a new snippet, collection or asset, so check all open documents again
+// A saved file may be a new snippet, collection, blueprint or asset, so check all open documents again
 documents.onDidSave(() => {
 	cache.clear();
 	documents.all().forEach(validate);

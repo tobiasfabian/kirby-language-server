@@ -157,7 +157,7 @@ test('reads blueprints and what they extend', () => {
 	const projectBlueprint = find('pages/project');
 
 	assert.deepEqual(extend(projectBlueprint.tabs.content.fields.cover, find), { label: 'Titelbild', type: 'filepicker', multiple: false });
-	assert.deepEqual(extend(projectBlueprint.tabs.seo, find), { label: 'SEO', fields: { metaTitle: 'text', metaDescription: { type: 'textarea' } } });
+	assert.deepEqual(extend(projectBlueprint.tabs.seo, find), { label: 'SEO', fields: { metaTitle: { type: 'text' }, metaDescription: { type: 'textarea' } } });
 	assert.equal(find('fields/contact-form'), null);
 	assert.equal(find('blocks/text'), null);
 });

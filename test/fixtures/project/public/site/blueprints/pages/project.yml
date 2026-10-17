@@ -6,5 +6,12 @@ tabs:
       cover:
         extends: fields/cover
         label: Titelbild
-      text: textarea
+      gallery: fields/gallery
+      intro: textarea
+      text:
+        type: textarea
   seo: tabs/seo
+  more:
+    extends:
+      - tabs/seo
+      - "tabs/missing"

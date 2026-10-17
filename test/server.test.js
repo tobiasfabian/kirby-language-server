@@ -263,3 +263,54 @@ test('jumps to a file in the docroot', async () => {
 
 	assert.equal(fileURLToPath(link.targetUri), `${project}/public/assets/images/logo.svg`);
 });
+
+/**
+ * Opens a blueprint of the fixture project
+ * @param {string} name
+ */
+function openBlueprint(name) {
+	const file = `${project}/public/site/blueprints/${name}.yml`;
+	const uri = pathToFileURL(file).href;
+	const text = fs.readFileSync(file, 'utf8');
+
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'yaml', version: 1, text } } });
+
+	const position = (needle, shift = 0) => {
+		const lines = text.slice(0, text.indexOf(needle) + shift).split('\n');
+		return { line: lines.length - 1, character: lines.at(-1).length };
+	};
+
+	return { uri, position };
+}
+
+test('warns about blueprints that don’t exist', async () => {
+	const { uri } = openBlueprint('pages/project');
+	const messages = await diagnosticsOf(uri);
+
+	assert.deepEqual(messages, [
+		'Blueprint “fields/gallery” not found. Kirby ignores it.',
+		'Blueprint “textarea” not found. Kirby ignores it. For a field type, use “type: textarea”.',
+		'Blueprint “tabs/missing” not found. Kirby ignores it.',
+	]);
+});
+
+test('completes blueprint names, the fitting folder first', async () => {
+	const { uri, position } = openBlueprint('pages/project');
+	const items = await request('textDocument/completion', { textDocument: { uri }, position: position('fields/cover', 'fields/'.length) });
+	const sorted = items.sort((a, b) => a.sortText.localeCompare(b.sortText)).map((item) => item.label);
+
+	assert.equal(sorted[0], 'fields/contact-form');
+	assert.ok(sorted.indexOf('fields/cover') < sorted.indexOf('pages/contact'));
+	assert.ok(sorted.includes('blocks/text'));
+	assert.equal(items.find((item) => item.label === 'pages/contact').detail, 'plugin site-contact · site/plugins/site-contact/blueprints/pages/contact.yml');
+});
+
+test('opens the blueprint a blueprint extends', async () => {
+	const { uri, position } = openBlueprint('pages/project');
+	const [link] = await request('textDocument/definition', { textDocument: { uri }, position: position('tabs/seo', 3) });
+
+	assert.equal(fileURLToPath(link.targetUri), `${project}/public/site/blueprints/tabs/seo.yml`);
+
+	const hover = await request('textDocument/hover', { textDocument: { uri }, position: position('fields/cover', 3) });
+	assert.equal(hover.contents.value, '**fields/cover** · site/blueprints/fields/cover.yml');
+});

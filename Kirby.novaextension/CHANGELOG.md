@@ -2,7 +2,8 @@
 
 - Completion for `snippet('…')`, `collection('…')` and `t('…')`/`tt('…')`/`tc('…')`, also `kirby.collection("…")` in blueprint queries, with each entry's origin, variables, signature or text
 - Completion for `type:` in blueprints with Kirby 6's field types
+- Completion for `extends:` and the shorthand `seo: fields/seo` in blueprints, with warnings for blueprints that don't exist
 - Completion of a snippet's variables in `snippet('…', ['…`
 - Completion of file paths in `hashedUrl('…')`, `asset('…')`, `svg('…')`, `css('…')`, `js('…')` and `url('assets/…')`
 - Command Open Referenced File (⌃⌥⌘O)
-- Warnings for snippets, collections, translation keys and files that don't exist
+- Warnings for snippets, collections, translation keys, files and blueprints that don't exist

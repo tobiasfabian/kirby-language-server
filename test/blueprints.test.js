@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { extend, fieldTypes, typeContext } from '../src/blueprints.js';
+import { blueprintReferences, extend, extendsContext, fieldTypes, referenceAt, typeContext } from '../src/blueprints.js';
 
 /**
  * Puts the cursor at `▮`
@@ -67,4 +67,65 @@ test('extends like Kirby: maps are merged, lists replaced', () => {
 	assert.deepEqual(extend({ extends: ['fields/base', 'fields/missing'], width: '1/2' }, find), { ...blueprints['fields/base'], width: '1/2' });
 	assert.deepEqual(extend('fields/loop', find), { label: 'Loop' });
 	assert.equal(extend(true, find), true);
+});
+
+test('finds keys in list items above the cursor', () => {
+	const text = 'columns:\n  - fields:\n      text:\n        type: te';
+	assert.deepEqual(typeContext(text, text.length), { prefix: 'te', start: text.length - 2 });
+
+	const sibling = 'columns:\n  - fields:\n      text: true\n    width: 1/2\n    type: ';
+	assert.equal(typeContext(sibling, sibling.length), null);
+});
+
+test('detects where a blueprint name goes', () => {
+	const at = (text) => extendsContext(text.replace('▮', ''), text.indexOf('▮'));
+
+	assert.deepEqual(at('title: Project\nextends: pages/▮'), { prefix: 'pages/', start: 24, folder: null });
+	assert.equal(at('fields:\n  cover:\n    extends: ▮')?.folder, 'fields');
+	assert.equal(at('fields:\n  - extends: fi▮')?.folder, 'fields');
+	assert.equal(at('tabs:\n  seo:\n    extends:\n      - ▮')?.folder, 'tabs');
+	assert.equal(at('fields:\n  seo: fields/▮')?.folder, 'fields');
+	assert.equal(at('tabs:\n  seo: ▮')?.folder, 'tabs');
+	assert.equal(at('fields:\n  seo:\n    label: ▮'), null);
+	assert.equal(at('title: ▮'), null);
+	assert.equal(at('fields:\n  tags:\n    options:\n      - ▮'), null);
+	assert.equal(at('columns:\n  - fields:\n      seo: ▮')?.folder, 'fields');
+	assert.equal(at('sections:\n  fields:\n    type: ▮'), null);
+});
+
+test('finds the blueprints a blueprint refers to', () => {
+	const text = [
+		'extends: pages/default',
+		'tabs:',
+		'  seo: tabs/seo',
+		'  content:',
+		'    fields:',
+		'      cover:',
+		'        extends: fields/cover',
+		'      gallery: "fields/gallery"',
+		'      text: true',
+		'      more:',
+		'        extends: [fields/a, fields/b]',
+		'      tags:',
+		'        options:',
+		'          a: A',
+		'sections:',
+		'  fields:',
+		'    type: fields',
+		'  files: sections/files',
+	].join('\n');
+	const references = blueprintReferences(text);
+
+	assert.deepEqual(references.map(({ name, shorthand }) => [name, shorthand]), [
+		['pages/default', false],
+		['tabs/seo', true],
+		['fields/cover', false],
+		['fields/gallery', true],
+		['fields/a', false],
+		['fields/b', false],
+		['sections/files', true],
+	]);
+	assert.equal(text.slice(references[3].start, references[3].end), 'fields/gallery');
+	assert.equal(referenceAt(text, text.indexOf('tabs/seo') + 2)?.name, 'tabs/seo');
+	assert.equal(referenceAt(text, 2), null);
 });

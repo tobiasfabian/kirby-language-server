@@ -14,7 +14,10 @@ When you type `snippet('`, `collection('` or `t('` (also `tt('`, `tc('`) in a PH
 
 File paths in `hashedUrl('`, `asset('`, `svg('`, `css('`, `js('` and `url('assets/` are completed with the files and folders of the docroot (where Kirby's `index.php` is), and marked if the file doesn't exist. ⌃⌥⌘O opens the file. URLs, `@auto` and files in `media/` (which Kirby creates on demand) aren't checked.
 
-In blueprints, `type: ` offers Kirby 6's field types, such as `pagelist` and `pagepicker`. `pages`, `files` and `users` are shown as deprecated aliases.
+In blueprints:
+
+- `type: ` offers Kirby 6's field types, such as `pagelist` and `pagepicker`. `pages`, `files` and `users` are shown as deprecated aliases.
+- `extends: ` and the shorthand `seo: fields/seo` (in `fields`, `tabs` and `sections`) offer the project's blueprints, those of the fitting folder first. Blueprints that don't exist are marked; `intro: textarea` too, because Kirby reads it as `extends` and not as the type. ⌃⌥⌘O opens the blueprint.
 
 Fallbacks such as `snippet(['m-card-project', 'm-card'])` are understood. Names built at runtime, like `snippet('blocks/' . $block->type())`, are not checked.
 

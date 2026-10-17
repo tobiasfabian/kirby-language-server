@@ -5,6 +5,8 @@
  * (https://getkirby.com/releases/6/blueprints).
  */
 
+import { isMap, isPair, isScalar, isSeq, parseDocument, visit } from 'yaml';
+
 // Kirby 6 field types (pages, files and users are deprecated aliases)
 const FIELD_TYPES = [
 	'blocks', 'buttons', 'checkboxes', 'color', 'date', 'email', 'entries', 'filelist', 'filepicker', 'gap',
@@ -14,6 +16,9 @@ const FIELD_TYPES = [
 ];
 
 const ALIASES = { files: 'filepicker', pages: 'pagepicker', users: 'userpicker' };
+
+// In these maps a string value extends a blueprint: `seo: fields/seo`
+const SHORTHAND_CONTAINERS = ['fields', 'tabs', 'sections'];
 
 // Types with a page in the field reference (https://getkirby.com/docs/reference/panel/fields)
 const DOCUMENTED = new Set([
@@ -33,6 +38,7 @@ const DOCUMENTED = new Set([
 /**
  * The keys above a position, nearest first, found by indentation:
  * each is the next line above that is indented less than the one before.
+ * A list item counts as `-`; `- fields:` as `fields` and then `-`.
  * @param {string[]} lines
  * @param {number} from index of the line to start at, going up
  * @param {number} indent only lines indented less than this are parents
@@ -52,7 +58,16 @@ export function ancestors(lines, from, indent) {
 		const lineIndent = lines[i].length - trimmed.length;
 
 		if (lineIndent < level) {
-			keys.push({ key: trimmed.startsWith('- ') || trimmed === '-' ? '-' : trimmed.split(':')[0].trim(), indent: lineIndent, line: i });
+			const isItem = trimmed.startsWith('- ') || trimmed === '-';
+
+			// `- fields:` is a list item and, two columns further in, a key
+			const itemKey = isItem ? trimmed.slice(1).match(/^(\s+)([\w.-]+)\s*:(?:\s|$)/) : null;
+
+			if (itemKey !== null && lineIndent + 1 + itemKey[1].length < level) {
+				keys.push({ key: itemKey[2], indent: lineIndent + 1 + itemKey[1].length, line: i });
+			}
+
+			keys.push({ key: isItem ? '-' : trimmed.split(':')[0].trim(), indent: lineIndent, line: i });
 			level = lineIndent;
 		}
 	}
@@ -97,6 +112,11 @@ export function typeContext(text, offset) {
 		return null;
 	}
 
+	// A column of the layout (`columns: - width: 1/2`), not a field
+	if (container?.key === 'columns' && match[2] === undefined && keys[0]?.key === '-') {
+		return null;
+	}
+
 	return { prefix: match[4], start: offset - match[4].length };
 }
 
@@ -116,11 +136,11 @@ export function fieldTypes() {
 }
 
 /**
- * Whether a value is a YAML map (not a list)
+ * Whether a parsed value is a map (not a list)
  * @param {any} value
  * @returns {value is Record<string, any>}
  */
-function isMap(value) {
+function isObject(value) {
 	return value !== null && typeof value === 'object' && Array.isArray(value) === false;
 }
 
@@ -134,7 +154,7 @@ function merge(base, props) {
 	const merged = { ...base };
 
 	for (const [key, value] of Object.entries(props)) {
-		merged[key] = isMap(value) && isMap(base[key]) ? merge(base[key], value) : value;
+		merged[key] = isObject(value) && isObject(base[key]) ? merge(base[key], value) : value;
 	}
 
 	return merged;
@@ -154,7 +174,7 @@ export function extend(props, find, seen = new Set()) {
 		props = { extends: props };
 	}
 
-	if (isMap(props) === false || props.extends === undefined) {
+	if (isObject(props) === false || props.extends === undefined) {
 		return props;
 	}
 
@@ -172,4 +192,137 @@ export function extend(props, find, seen = new Set()) {
 	delete result.extends;
 
 	return result;
+}
+
+/**
+ * Whether the key at `index` holds fields, tabs or sections. Names and props alternate:
+ * in `sections: { fields: { type: fields } }` the inner `fields` is the name of a section.
+ * @param {Ancestor[]} keys nearest first
+ * @param {number} index
+ * @returns {boolean}
+ */
+function isContainer(keys, index) {
+	return SHORTHAND_CONTAINERS.includes(keys[index]?.key) === true && isContainer(keys, index + 1) === false;
+}
+
+/**
+ * The folder of blueprints that fits what extends: `fields` for a field, `tabs` for a tab …,
+ * null at the top of a blueprint
+ * @param {Ancestor[]} keys nearest first
+ * @param {number} index of the key above the field, tab or section
+ */
+function folderOf(keys, index) {
+	return isContainer(keys, index) === true ? keys[index].key : null;
+}
+
+/**
+ * If the cursor is where a blueprint name goes, returns the part typed so far,
+ * where it starts and the folder of blueprints that fits (see `folderOf`):
+ * `extends: ▮`, a list item below `extends:`, or the shorthand `seo: ▮` in `fields`, `tabs` and `sections`
+ * @param {string} text
+ * @param {number} offset
+ * @returns {{ prefix: string, start: number, folder: string | null } | null}
+ */
+export function extendsContext(text, offset) {
+	const { before, lines } = positionInfo(text, offset);
+	const result = (match, folder) => ({ prefix: match.at(-1), start: offset - match.at(-1).length, folder });
+	const last = lines.length - 1;
+
+	const extendsKey = before.match(/^(\s*)(-\s+)?extends:\s*(["']?)([\w./-]*)$/);
+
+	if (extendsKey !== null) {
+		const keys = ancestors(lines, last, extendsKey[1].length);
+		return result(extendsKey, folderOf(keys, extendsKey[2] === undefined ? 1 : 0));
+	}
+
+	const item = before.match(/^(\s*)-\s+(["']?)([\w./-]*)$/);
+
+	if (item !== null) {
+		const keys = ancestors(lines, last, item[1].length);
+		// keys: extends, the field (or tab …), its container
+		return keys[0]?.key === 'extends' ? result(item, folderOf(keys, 2)) : null;
+	}
+
+	const shorthand = before.match(/^(\s*)[\w-]+:\s+(["']?)([\w./-]*)$/);
+
+	if (shorthand !== null) {
+		const folder = folderOf(ancestors(lines, last, shorthand[1].length), 0);
+		return folder === null ? null : result(shorthand, folder);
+	}
+
+	return null;
+}
+
+/**
+ * Whether the map at the end of a path (from yaml's `visit`) holds fields, tabs or sections,
+ * with names and props alternating as in `isContainer`
+ * @param {readonly any[]} path
+ */
+function isContainerMap(path) {
+	let container = false;
+
+	for (let i = 1; i < path.length; i++) {
+		if (isMap(path[i]) === true) {
+			const pair = path[i - 1];
+			const parentIsContainer = container && isMap(path[i - 2]) === true;
+			container = isPair(pair) === true && isScalar(pair.key) === true && SHORTHAND_CONTAINERS.includes(pair.key.value) === true && parentIsContainer === false;
+		}
+	}
+
+	return container;
+}
+
+/**
+ * @typedef {object} Reference
+ * @property {string} name the blueprint
+ * @property {number} start
+ * @property {number} end
+ * @property {boolean} shorthand whether it's a string value in `fields`, `tabs` or `sections`
+ */
+
+/**
+ * Finds the blueprint names a blueprint extends: values of `extends`
+ * (also lists) and the shorthand `seo: fields/seo` in `fields`, `tabs` and `sections`
+ * @param {string} text
+ * @returns {Reference[]}
+ */
+export function blueprintReferences(text) {
+	const document = parseDocument(text, { uniqueKeys: false, logLevel: 'silent' });
+	const references = [];
+
+	const add = (node, shorthand) => {
+		if (isScalar(node) === true && typeof node.value === 'string' && node.value !== '' && node.range !== undefined) {
+			const start = node.range[0] + (node.type === 'QUOTE_DOUBLE' || node.type === 'QUOTE_SINGLE' ? 1 : 0);
+			references.push({ name: node.value, start, end: start + node.value.length, shorthand });
+		}
+	};
+
+	visit(document, {
+		Pair(_, pair, path) {
+			if (isScalar(pair.key) === true && pair.key.value === 'extends') {
+				(isSeq(pair.value) === true ? pair.value.items : [pair.value]).forEach((node) => add(node, false));
+			} else if (isContainerMap(path) === true) {
+				add(pair.value, true);
+			}
+		},
+	});
+
+	return references;
+}
+
+/**
+ * The blueprint name at the cursor, if there is one
+ * @param {string} text
+ * @param {number} offset
+ */
+export function referenceAt(text, offset) {
+	return blueprintReferences(text).find(({ start, end }) => offset >= start && offset <= end) ?? null;
+}
+
+/**
+ * Whether a name is a Kirby 6 field type (or a deprecated alias)
+ * @param {string} name
+ */
+export function isFieldType(name) {
+	return FIELD_TYPES.includes(name) === true || ALIASES[name] !== undefined;
 }

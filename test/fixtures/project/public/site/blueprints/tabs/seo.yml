@@ -1,5 +1,6 @@
 label: SEO
 fields:
-  metaTitle: text
+  metaTitle:
+    type: text
   metaDescription:
     type: textarea
