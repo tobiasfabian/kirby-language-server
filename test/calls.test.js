@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { completionContext, fieldContext, findCalls, nameAt, propsContext } from '../src/calls.js';
+import { completionContext, fieldContext, fieldMethodContext, findCalls, nameAt, propsContext, variableAt, variableContext } from '../src/calls.js';
 
 const names = (text) => findCalls(text).map((call) => [call.kind, ...call.names.map(({ name }) => name)]);
 
@@ -135,4 +135,13 @@ test('detects field names after $page->', () => {
 	assert.deepEqual(fieldContext('<?= $site->co|ver() ?>'.replace('|', ''), 13), { variable: 'site', prefix: 'co', start: 11, end: 16, call: true });
 	assert.equal(fieldContext('<?= $page->children()->', 23), null);
 	assert.equal(fieldContext('<?= $item->', 11), null);
+});
+
+test('detects field methods and variables', () => {
+	assert.deepEqual(fieldMethodContext('<?= $page->cover()->to', 22), { variable: 'page', field: 'cover', prefix: 'to', start: 20, end: 22, call: false });
+	assert.equal(fieldMethodContext('<?= $page->children()->first()->', 32), null);
+	assert.deepEqual(variableContext('<?= $co', 7), { prefix: 'co', start: 4, end: 7 });
+	assert.equal(variableContext('<?= $page->', 11), null);
+	assert.equal(variableContext('<?= "\\$co', 9), null);
+	assert.deepEqual(variableAt('<?= $cover ?>', 6), { name: 'cover', start: 4, end: 10 });
 });

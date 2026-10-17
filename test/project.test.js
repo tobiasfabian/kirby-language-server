@@ -5,7 +5,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { extend } from '../src/blueprints.js';
-import { collectionSignature, findAsset, findDocroot, findSites, listBlueprints, listCollections, listContentTemplates, listDocroot, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from '../src/project.js';
+import { collectionSignature, controllerVariables, findAsset, findDocroot, findSites, listBlueprints, listCollections, listContentTemplates, listControllers, listDocroot, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from '../src/project.js';
 
 const project = fileURLToPath(new URL('./fixtures/project', import.meta.url));
 const site = path.join(project, 'public', 'site');
@@ -177,4 +177,24 @@ test('lists the templates pages in the content folder use', () => {
 
 	assert.deepEqual([...templates.keys()].sort(), ['error', 'project']);
 	assert.equal(templates.get('error')?.file, path.join(project, 'public/content/error/error.de.txt'));
+});
+
+test('reads what controllers return', (t) => {
+	const controllers = listControllers(site);
+	assert.deepEqual([...controllers.keys()].sort(), ['project', 'site']);
+	assert.deepEqual(controllerVariables(controllers.get('project')), { variables: [{ name: 'cover', line: 4, value: '$page->cover()->toFile()' }], complete: true });
+
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kirby-'));
+	t.after(() => fs.rmSync(root, { recursive: true }));
+
+	const read = (code) => {
+		fs.writeFileSync(path.join(root, 'controller.php'), code);
+		const { variables, complete } = controllerVariables({ file: path.join(root, 'controller.php'), line: 0, source: 'site' });
+		return [variables.map(({ name }) => name), complete];
+	};
+
+	assert.deepEqual(read(`<?php\nreturn fn ($page) => ['a' => 1, 'b' => 2];`), [['a', 'b'], true]);
+	assert.deepEqual(read(`<?php\nreturn function () {\n\t$plan = 1;\n\treturn compact('plan');\n};`), [['plan'], true]);
+	assert.deepEqual(read(`<?php\nreturn function ($kirby) {\n\t$shared = $kirby->controller('site');\n\treturn A::merge($shared, ['nav' => 1]);\n};`), [['nav'], false]);
+	assert.deepEqual(read(`<?php\nreturn function ($page) {\n\t$items = $page->children()->map(function ($child) {\n\t\treturn ['inner' => 1];\n\t});\n\tif ($items->isEmpty()) {\n\t\treturn ['items' => null];\n\t}\n\treturn ['items' => $items, ...$more];\n};`), [['items', 'items'], false]);
 });

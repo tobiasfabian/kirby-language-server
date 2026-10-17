@@ -194,7 +194,7 @@ test('jumps to the translation in the default language', async () => {
 test('warns about missing snippets, collections and translations', async () => {
 	const messages = await diagnosticsOf(templateUri);
 
-	assert.equal(messages.length, 7);
+	assert.equal(messages.length, 8);
 	assert.match(messages[0], /Snippet “head” not found/);
 	assert.match(messages[1], /Snippet “m-nav-footer” not found/);
 	assert.match(messages[2], /Collection “missing” not found/);
@@ -202,6 +202,7 @@ test('warns about missing snippets, collections and translations', async () => {
 	assert.match(messages[4], /Translation “missing.plural” not found/);
 	assert.match(messages[5], /File “assets\/images\/missing.svg” not found/);
 	assert.match(messages[6], /Template “missing-template” not found: no blueprint pages\/missing-template or files\/missing-template, no template missing-template.php and no page that uses it/);
+	assert.equal(messages[7], 'Variable “$block” is not defined: the template doesn’t set it and its controller doesn’t return it.');
 });
 
 test('checks collections in blueprint queries', async () => {
@@ -479,4 +480,33 @@ test('completes field methods, the fitting ones first', async () => {
 
 	// Not a field: left to PHP's language server
 	assert.deepEqual(await request('textDocument/completion', { textDocument: { uri }, position: position('children()->', 12) }), []);
+});
+
+test('completes, checks and opens the variables of a template’s controllers', async () => {
+	const text = '<?php foreach ($navigation as $item): ?>\n<?= $item->title() ?> <?= $cover ?> <?= $missing ?>\n<?php endforeach ?>\n<?= $c';
+	const { uri, position } = openPhp('templates/project.php', text);
+	const items = await request('textDocument/completion', { textDocument: { uri }, position: { line: 3, character: 6 } });
+	const labels = items.map((item) => item.label);
+
+	assert.deepEqual(labels.slice(0, 2), ['$navigation', '$cover']);
+	assert.ok(labels.includes('$page'));
+	assert.equal(items.find((item) => item.label === '$cover').detail, '$page->cover()->toFile()');
+	assert.equal(items[0].textEdit.range.start.character, 4);
+
+	assert.deepEqual(await diagnosticsOf(uri), ['$missing', '$c'].map((name) => `Variable “${name}” is not defined: the template doesn’t set it and its controller doesn’t return it.`));
+
+	const [link] = await request('textDocument/definition', { textDocument: { uri }, position: position('$cover', 2) });
+	assert.equal(fileURLToPath(link.targetUri), `${project}/public/site/controllers/project.php`);
+	assert.equal(link.targetSelectionRange.start.line, 4);
+
+	const hover = await request('textDocument/hover', { textDocument: { uri }, position: position('$navigation', 2) });
+	assert.match(hover.contents.value, /\*\*\$navigation\*\* · site\/controllers\/site.php/);
+});
+
+test('doesn’t warn about variables of snippets or of controllers it can’t read', async () => {
+	const snippet = openPhp('snippets/m-teaser.php', '<?= $title ?>');
+	assert.deepEqual(await diagnosticsOf(snippet.uri), []);
+
+	const template = openPhp('templates/default.php', '<?php extract($data) ?><?= $title ?>');
+	assert.deepEqual(await diagnosticsOf(template.uri), []);
 });

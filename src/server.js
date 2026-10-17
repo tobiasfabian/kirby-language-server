@@ -12,8 +12,9 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { blueprintFields, blueprintReferences, extend, extendsContext, fieldMethods, fieldProperties, fieldTypes, fittingMethods, isFieldType, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
-import { completionContext, fieldContext, fieldMethodContext, findCalls, nameAt, propsContext } from './calls.js';
-import { classMethods, closureInfo, collectionSignature, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listDocroot, listMethods, listModels, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
+import { completionContext, fieldContext, fieldMethodContext, findCalls, nameAt, propsContext, variableAt, variableContext } from './calls.js';
+import { classMethods, closureInfo, collectionSignature, controllerVariables, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listControllers, listDocroot, listMethods, listModels, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
+import { undefinedVariables } from './variables.js';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -351,6 +352,102 @@ function valueCompletion(document, position, site) {
 	}));
 }
 
+// What Kirby gives every template
+const TEMPLATE_DATA = { kirby: 'Kirby\\Cms\\App', site: 'Kirby\\Cms\\Site', pages: 'Kirby\\Cms\\Pages', page: 'Kirby\\Cms\\Page' };
+
+/**
+ * @typedef {{ entry: import('./project.js').Entry, value: string, controller: string }} TemplateVariable
+ */
+
+/**
+ * The variables the controllers give a template in `site/templates`: those of the `site`
+ * controller, then those of the template's own (for `project.json.php` the `project.json`
+ * controller, else `project`), as Kirby merges them. Null for other files.
+ * `complete` is false if a controller returns something that can't be read completely.
+ * @param {string} file
+ * @param {string} site
+ * @returns {{ variables: Map<string, TemplateVariable>, complete: boolean } | null}
+ */
+function templateVariables(file, site) {
+	const [folder, name, ...rest] = path.relative(site, file).split(path.sep);
+
+	if (folder !== 'templates' || rest.length > 0 || name.endsWith('.php') === false) {
+		return null;
+	}
+
+	const [template, type] = name.slice(0, -4).split('.');
+	const controllers = cached('controllers:' + site, () => listControllers(site));
+	const lookup = (base) => (type === undefined ? undefined : controllers.get(`${base}.${type}`)) ?? controllers.get(base);
+	const variables = new Map();
+	let complete = true;
+
+	for (const [controller, entry] of [['site', lookup('site')], [template, lookup(template)]]) {
+		if (entry === undefined) {
+			continue;
+		}
+
+		const result = cached(`controller:${entry.file}:${entry.line}`, () => controllerVariables(entry));
+		complete &&= result.complete;
+
+		for (const variable of result.variables) {
+			variables.set(variable.name, { entry: { ...entry, line: variable.line, value: variable.value }, value: variable.value, controller });
+		}
+	}
+
+	return { variables, complete };
+}
+
+/**
+ * Completion for variables in a template: what its controllers return, and Kirby's `$page`, `$site` …
+ * @param {TextDocument} document
+ * @param {{ line: number, character: number }} position
+ * @param {string} site
+ */
+function variableCompletion(document, position, site) {
+	const context = variableContext(document.getText(), document.offsetAt(position));
+	const data = context === null ? null : templateVariables(fileURLToPath(document.uri), site);
+
+	if (data === null) {
+		return null;
+	}
+
+	const range = { start: document.positionAt(context.start), end: document.positionAt(context.end) };
+	const item = (name, detail, documentation, sortText) => ({
+		label: '$' + name,
+		kind: CompletionItemKind.Variable,
+		detail,
+		documentation,
+		filterText: '$' + name,
+		sortText,
+		textEdit: { range, newText: '$' + name },
+	});
+
+	return [
+		...[...data.variables].map(([name, variable]) => item(name, shorten(variable.value), { kind: MarkupKind.Markdown, value: describe('variable', name, variable.entry, site) }, '0' + name)),
+		...Object.entries(TEMPLATE_DATA).filter(([name]) => data.variables.has(name) === false).map(([name, type]) => item(name, type, 'Kirby', '1' + name)),
+	];
+}
+
+/**
+ * Warnings for variables a template uses that neither it nor its controllers define.
+ * Only if every controller could be read and the template doesn't define variables in ways that can't be followed.
+ * @param {TextDocument} document
+ * @param {string} site
+ */
+function variableDiagnostics(document, site) {
+	const data = templateVariables(fileURLToPath(document.uri), site);
+	const used = data?.complete === true ? undefinedVariables(document.getText()) : null;
+
+	return (used ?? [])
+		.filter(({ name }) => data.variables.has(name) === false && TEMPLATE_DATA[name] === undefined)
+		.map(({ name, start, end }) => ({
+			severity: DiagnosticSeverity.Warning,
+			range: { start: document.positionAt(start), end: document.positionAt(end) },
+			message: `Variable “$${name}” is not defined: the template doesn’t set it and its controller doesn’t return it.`,
+			source: 'Kirby',
+		}));
+}
+
 /**
  * Completion for the keys of a field: the options of its type (from `type`, what it
  * extends, or its name), without those it already has. Without a known type, `type` and `extends`.
@@ -631,12 +728,17 @@ function origin(entry, site) {
 
 /**
  * Markdown for a snippet or collection: its origin and what it expects or returns
- * @param {import('./calls.js').Kind | 'blueprint'} kind
+ * @param {import('./calls.js').Kind | 'blueprint' | 'variable'} kind
  * @param {string} name
- * @param {import('./project.js').Entry} entry
+ * @param {import('./project.js').Entry & { value?: string }} entry
  * @param {string} site
  */
 function describe(kind, name, entry, site) {
+	// The entry of a controller variable carries its value
+	if (kind === 'variable') {
+		return `**$${name}** · ${origin(entry, site)}\n\n\`\`\`php\n'${name}' => ${entry.value}\n\`\`\``;
+	}
+
 	if (kind === 'template') {
 		const page = templatesOf(site, 'pages').get(name);
 		const file = templatesOf(site, 'files').get(name);
@@ -688,6 +790,15 @@ function lookup(textDocument, position) {
 		entry = templateEntry(templatesOf(site, slot.folder).get(slot.name));
 	} else if (name !== null) {
 		entry = name.kind === 'asset' ? assetEntry(site, name.name) : entriesOf(site, name.kind).get(name.name);
+	} else if (site !== null) {
+		// A variable in a template that its controller returns
+		const variable = variableAt(document.getText(), offset);
+		const found = variable === null ? undefined : templateVariables(fileURLToPath(document.uri), site)?.variables.get(variable.name);
+
+		if (found !== undefined) {
+			name = { kind: 'variable', ...variable };
+			entry = found.entry;
+		}
 	}
 
 	return entry === undefined ? null : { document, site, name, entry };
@@ -825,6 +936,8 @@ function validate(document) {
 		});
 	}
 
+	diagnostics.push(...variableDiagnostics(document, site));
+
 	if (isBlueprint(document) === true) {
 		diagnostics.push(...blueprintDiagnostics(document, site));
 
@@ -860,8 +973,8 @@ connection.onInitialize((params) => {
 	return {
 		capabilities: {
 			textDocumentSync: TextDocumentSyncKind.Incremental,
-			// A space for `type: ` in blueprints, `>` for `$page->`
-			completionProvider: { triggerCharacters: ['\'', '"', '/', ' ', '>'] },
+			// A space for `type: ` in blueprints, `>` for `$page->`, `$` for variables
+			completionProvider: { triggerCharacters: ['\'', '"', '/', ' ', '>', '$'] },
 			definitionProvider: true,
 			hoverProvider: true,
 			codeLensProvider: { resolveProvider: false },
@@ -889,7 +1002,7 @@ connection.onCompletion(({ textDocument, position }) => {
 		}
 	}
 
-	const fields = site ? fieldMethodCompletion(document, position, site) ?? fieldCompletion(document, position, site) : null;
+	const fields = site ? fieldMethodCompletion(document, position, site) ?? fieldCompletion(document, position, site) ?? variableCompletion(document, position, site) : null;
 
 	if (fields !== null) {
 		return fields;

@@ -327,3 +327,43 @@ export function fieldMethodContext(text, offset) {
 
 	return { variable: /** @type {any} */ (match[1]), field: match[2], prefix: match[3], start: offset - match[3].length, end, call: text[end] === '(' };
 }
+
+/**
+ * If the cursor is in a variable name (`$pro▮`), returns the part typed so far
+ * (without `$`), where the variable starts (at `$`) and where its name ends
+ * @param {string} text
+ * @param {number} offset
+ * @returns {{ prefix: string, start: number, end: number } | null}
+ */
+export function variableContext(text, offset) {
+	const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
+	const match = text.slice(lineStart, offset).match(/(?<![\w$\\])\$(\w*)$/);
+
+	if (match === null) {
+		return null;
+	}
+
+	return { prefix: match[1], start: offset - match[0].length, end: offset + text.slice(offset).match(/^\w*/)[0].length };
+}
+
+/**
+ * The variable at the cursor, `$name`, if there is one
+ * @param {string} text
+ * @param {number} offset
+ * @returns {{ name: string, start: number, end: number } | null}
+ */
+export function variableAt(text, offset) {
+	const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
+	const lineEnd = text.indexOf('\n', offset);
+	const line = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd);
+
+	for (const match of line.matchAll(/\$([a-zA-Z_]\w*)/g)) {
+		const start = lineStart + match.index;
+
+		if (offset >= start && offset <= start + match[0].length) {
+			return { name: match[1], start, end: start + match[0].length };
+		}
+	}
+
+	return null;
+}

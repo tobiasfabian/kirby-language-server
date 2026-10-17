@@ -919,3 +919,152 @@ export function listModels(site) {
 
 	return models;
 }
+
+/**
+ * The controllers of a site by name (`project`, `project.json`, `site`): `site/controllers`
+ * wins over those plugins and the config register, as in Kirby
+ * @param {string} site
+ * @returns {Map<string, Entry>}
+ */
+export function listControllers(site) {
+	const controllers = new Map();
+
+	for (const plugin of plugins(site)) {
+		for (const { name, file, line, inline } of registered(path.join(site, 'plugins', plugin, 'index.php'), 'plugin').controllers) {
+			controllers.set(name, { file, line, inline, source: 'plugin', plugin });
+		}
+	}
+
+	for (const { name, file, line, inline } of registered(path.join(site, 'config', 'config.php'), 'config').controllers) {
+		controllers.set(name, { file, line, inline, source: 'config' });
+	}
+
+	for (const { name, file } of phpFiles(path.join(site, 'controllers'))) {
+		controllers.set(name, { file, line: 0, source: 'site' });
+	}
+
+	return controllers;
+}
+
+/**
+ * @typedef {object} ControllerVariable
+ * @property {string} name
+ * @property {number} line 0-based line of its key
+ * @property {string} value the code of its value
+ */
+
+/**
+ * Reads the keys of what an expression returns: an array, `compact('a', 'b')`,
+ * or the arrays merged by `A::merge()`/`array_merge()`
+ * @param {string} code
+ * @param {number} index where the expression starts
+ * @param {ControllerVariable[]} variables found keys are added here
+ * @returns {boolean} whether everything could be read
+ */
+function returnedKeys(code, index, variables) {
+	index += code.slice(index).match(/^\s*/)[0].length;
+
+	if (code[index] === '[') {
+		const close = closingBracket(code, index);
+
+		for (const entry of arrayEntries(code, index)) {
+			variables.push({ name: entry.key, line: lineAt(code, entry.keyStart), value: code.slice(entry.valueStart, entry.valueEnd).trim() });
+		}
+
+		// `...$data` adds keys that can't be known
+		return /\.\.\.\s*\$/.test(withoutComments(code.slice(index, close))) === false;
+	}
+
+	const call = code.slice(index).match(/^(compact|A::merge|array_merge)\s*\(/);
+
+	if (call === null) {
+		return false;
+	}
+
+	const open = index + call[0].length - 1;
+	const close = closingBracket(code, open);
+
+	if (call[1] === 'compact') {
+		for (const name of stringsIn(code, open, close)) {
+			variables.push({ name, line: lineAt(code, open), value: '$' + name });
+		}
+
+		return true;
+	}
+
+	// The arguments of A::merge(), each read on its own
+	let complete = true;
+	let start = open + 1;
+
+	for (let i = open + 1, depth = 0; i <= close; i++) {
+		const char = code[i];
+
+		if ('[({'.includes(char)) {
+			depth++;
+		} else if (')]}'.includes(char) && depth > 0) {
+			depth--;
+		} else if ((char === ',' && depth === 0) || i === close) {
+			if (code.slice(start, i).trim() !== '') {
+				complete = returnedKeys(code, start, variables) && complete;
+			}
+
+			start = i + 1;
+		} else if (char === '\'' || char === '"') {
+			const end = code.indexOf(char, i + 1);
+			i = end === -1 ? close : end;
+		}
+	}
+
+	return complete;
+}
+
+/**
+ * Reads what a controller returns: the keys of the arrays its closure returns
+ * (`return [...]`, `return compact('a')`, arrays in `A::merge()`), not those of closures inside it.
+ * `complete` is false if a return value couldn't be read completely, e.g. `return $data`.
+ * @param {Entry} entry
+ * @returns {{ variables: ControllerVariable[], complete: boolean }}
+ */
+export function controllerVariables(entry) {
+	const code = read(entry.file);
+	const offset = code === null ? -1 : entry.line > 0 ? code.split('\n').slice(0, entry.line).join('\n').length : code.search(/\breturn\s+(?:static\s+)?(?:function|fn)\b/);
+	const keyword = offset === -1 ? null : code.slice(offset).match(/(?:function|fn)\s*\(/);
+
+	if (keyword === null) {
+		return { variables: [], complete: false };
+	}
+
+	const open = offset + keyword.index + keyword[0].length - 1;
+	const afterParams = closingBracket(code, open) + 1;
+	const variables = [];
+
+	// fn (...) => [...]
+	if (keyword[0].startsWith('fn') === true) {
+		const arrow = code.indexOf('=>', afterParams);
+		return { variables, complete: returnedKeys(code, arrow + 2, variables) };
+	}
+
+	const bodyStart = code.indexOf('{', afterParams);
+	const bodyEnd = closingBracket(code, bodyStart);
+
+	// The bodies of closures inside, whose `return` belongs to them
+	const nested = [];
+
+	for (const match of code.slice(bodyStart + 1, bodyEnd).matchAll(/\bfunction\s*\(/g)) {
+		const params = bodyStart + 1 + match.index + match[0].length - 1;
+		const start = code.indexOf('{', closingBracket(code, params));
+		nested.push([start, closingBracket(code, start)]);
+	}
+
+	let complete = true;
+
+	for (const match of code.slice(bodyStart + 1, bodyEnd).matchAll(/\breturn\b/g)) {
+		const index = bodyStart + 1 + match.index;
+
+		if (nested.some(([start, end]) => index > start && index < end) === false) {
+			complete = returnedKeys(code, index + match[0].length, variables) && complete;
+		}
+	}
+
+	return { variables, complete };
+}
