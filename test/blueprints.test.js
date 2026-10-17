@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { blueprintFields, blueprintReferences, extend, extendsContext, fieldProperties, fieldTypes, propertyContext, referenceAt, templateSlots, typeContext } from '../src/blueprints.js';
+import { blueprintFields, blueprintReferences, extend, extendsContext, fieldProperties, fieldTypes, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from '../src/blueprints.js';
 
 /**
  * Puts the cursor at `▮`
@@ -221,4 +221,22 @@ test('collects the fields of a blueprint that store content', () => {
 		{ name: 'metaTitle', type: 'text', label: undefined },
 		{ name: 'old', type: 'text', label: undefined },
 	]);
+});
+
+test('detects the value of a field’s option', () => {
+	const at = (text) => valueContext(text.replace('▮', ''), text.indexOf('▮'));
+
+	assert.deepEqual(at('fields:\n  title:\n    type: text\n    translate: ▮\n    required: true'), { key: 'translate', prefix: '', start: 47, name: 'title', type: 'text', extends: undefined, present: ['type', 'required'] });
+	assert.equal(at('fields:\n  title:\n    counter: fa▮')?.prefix, 'fa');
+	assert.equal(at('fields:\n  title:\n    label: "Ti▮'), null);
+	assert.equal(at('tabs:\n  seo:\n    icon: ▮'), null);
+	assert.equal(at('fields:\n  title:\n    translate:▮'), null);
+});
+
+test('knows the literal values of a PHP type', () => {
+	assert.deepEqual(literalValues('bool|null'), ['true', 'false', 'null']);
+	assert.deepEqual(literalValues('bool'), ['true', 'false']);
+	assert.deepEqual(literalValues('array|string|false|null'), ['false', 'null']);
+	assert.deepEqual(literalValues('string'), []);
+	assert.deepEqual(literalValues('array|string|null'), []);
 });

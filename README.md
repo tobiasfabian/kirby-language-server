@@ -16,7 +16,7 @@ In PHP files:
 In blueprints (`src/blueprints.js`):
 
 - **`type:`**: Kirby 6 field types, with `pages`, `files` and `users` as deprecated aliases
-- **Field options**: at a key of a field, the options of its type (from `type`, what it `extends`, or its name), with type, default and description, without those it already has. They are read from Kirby 6's field classes into `src/field-properties.json`.
+- **Field options**: at a key of a field, the options of its type (from `type`, what it `extends`, or its name), with type, default and description, without those it already has. They are read from Kirby 6's field classes into `src/field-properties.json`. In the value of a boolean option, `true`, `false` and (if it may be empty) `null`, the default marked.
 - **`extends:`** and the shorthand `seo: fields/seo` in `fields`, `tabs` and `sections`: the blueprints from `site/blueprints`, plugins, the config and Kirby, those of the fitting folder first
 - **Template names** in `template`, `templates`, `templatesIgnore` and `create` of a `pagelist`, `template` of a `filelist`, `uploads` of a `filepicker` or `textarea`, and `options: changeTemplate`
 

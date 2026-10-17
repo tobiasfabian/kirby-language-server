@@ -451,23 +451,22 @@ export function fieldProperties(type) {
 }
 
 /**
- * If the cursor is where a key of a field goes (a line with nothing but the start
- * of a key), returns the part typed so far, where it starts, the field's name,
- * its `type` and `extends` if set, and the keys it already has
- * @param {string} text
- * @param {number} offset
- * @returns {{ prefix: string, start: number, name: string, type?: string, extends?: string, present: string[] } | null}
+ * @typedef {object} FieldAtLine
+ * @property {string} name
+ * @property {string} [type] its `type`, if set
+ * @property {string} [extends] what it extends, if set
+ * @property {string[]} present the keys it has, but the one at the cursor
  */
-export function propertyContext(text, offset) {
-	const { before, lines } = positionInfo(text, offset);
-	const match = before.match(/^( +)([\w-]*)$/);
 
-	if (match === null) {
-		return null;
-	}
-
+/**
+ * The field whose keys are indented by `indent` on the line after `lines`, if it's one
+ * @param {string} text
+ * @param {string[]} lines the lines above the cursor
+ * @param {number} indent
+ * @returns {FieldAtLine | null}
+ */
+function fieldOfLine(text, lines, indent) {
 	// keys: the field, then `fields`
-	const indent = match[1].length;
 	const keys = ancestors(lines, lines.length - 1, indent);
 
 	if (keys[0] === undefined || keys[0].key === '-' || keys[1]?.key !== 'fields' || isContainer(keys, 1) === false) {
@@ -498,13 +497,54 @@ export function propertyContext(text, offset) {
 	const value = (key) => own.map((line) => line.match(new RegExp(`^${key}:\\s*["']?([\\w./-]+)`))?.[1]).find((found) => found !== undefined);
 
 	return {
-		prefix: match[2],
-		start: offset - match[2].length,
 		name: keys[0].key,
 		type: value('type'),
 		extends: value('extends'),
 		present: own.map((line) => line.match(/^([\w-]+)\s*:/)?.[1]).filter((key) => key !== undefined),
 	};
+}
+
+/**
+ * If the cursor is where a key of a field goes (a line with nothing but the start
+ * of a key), returns the part typed so far, where it starts, and the field
+ * @param {string} text
+ * @param {number} offset
+ * @returns {({ prefix: string, start: number } & FieldAtLine) | null}
+ */
+export function propertyContext(text, offset) {
+	const { before, lines } = positionInfo(text, offset);
+	const match = before.match(/^( +)([\w-]*)$/);
+	const field = match === null ? null : fieldOfLine(text, lines, match[1].length);
+
+	return field === null ? null : { prefix: match[2], start: offset - match[2].length, ...field };
+}
+
+/**
+ * If the cursor is in the value of a key of a field (`translate: ▮`), returns the key,
+ * the part of the value typed so far, where it starts, and the field
+ * @param {string} text
+ * @param {number} offset
+ * @returns {({ key: string, prefix: string, start: number } & FieldAtLine) | null}
+ */
+export function valueContext(text, offset) {
+	const { before, lines } = positionInfo(text, offset);
+	const match = before.match(/^( +)([\w-]+):[ \t]+([\w-]*)$/);
+	const field = match === null ? null : fieldOfLine(text, lines, match[1].length);
+
+	return field === null ? null : { key: match[2], prefix: match[3], start: offset - match[3].length, ...field };
+}
+
+/**
+ * The values YAML can write literally for a PHP type: `true` and `false` for `bool`,
+ * and `null` next to them. Almost every option may be null (not set), so `null` alone isn't offered.
+ * @param {string} type e.g. `array|string|false|null`
+ * @returns {string[]}
+ */
+export function literalValues(type) {
+	const types = type.split('|');
+	const values = ['true', 'false', 'null'].filter((value) => types.includes(value) || (value !== 'null' && types.includes('bool')));
+
+	return values.some((value) => value !== 'null') ? values : [];
 }
 
 // Fields that show something but store no content, so `$page->name()` has nothing to return

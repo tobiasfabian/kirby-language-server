@@ -11,7 +11,7 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { blueprintFields, blueprintReferences, extend, extendsContext, fieldProperties, fieldTypes, isFieldType, propertyContext, referenceAt, templateSlots, typeContext } from './blueprints.js';
+import { blueprintFields, blueprintReferences, extend, extendsContext, fieldProperties, fieldTypes, isFieldType, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
 import { completionContext, fieldContext, findCalls, nameAt, propsContext } from './calls.js';
 import { collectionSignature, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listDocroot, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
 
@@ -214,6 +214,46 @@ function fieldCompletion(document, position, site) {
 }
 
 /**
+ * The type of a field in a blueprint: its `type`, the type of what it extends, or its name
+ * @param {import('./blueprints.js').FieldAtLine} field
+ * @param {string} site
+ */
+function typeOfField(field, site) {
+	const extended = field.extends === undefined ? null : extend({ extends: field.extends }, blueprintFinder(site));
+	return field.type ?? extended?.type ?? field.name;
+}
+
+/**
+ * Completion for the value of a field's option that can be written literally:
+ * `true` and `false` for a boolean, `null` if it may be empty
+ * @param {TextDocument} document
+ * @param {{ line: number, character: number }} position
+ * @param {string} site
+ */
+function valueCompletion(document, position, site) {
+	const context = valueContext(document.getText(), document.offsetAt(position));
+	const option = context === null ? undefined : fieldProperties(typeOfField(context, site))?.find(({ name }) => name === context.key);
+	const values = option === undefined ? [] : literalValues(option.type);
+
+	if (values.length === 0) {
+		return null;
+	}
+
+	const range = { start: document.positionAt(context.start), end: position };
+
+	return values.map((value, index) => ({
+		label: value,
+		kind: CompletionItemKind.Value,
+		// An option without a default is null
+		detail: value === (option.default ?? 'null') ? 'default' : undefined,
+		documentation: option.description,
+		filterText: value,
+		sortText: '2' + index,
+		textEdit: { range, newText: value },
+	}));
+}
+
+/**
  * Completion for the keys of a field: the options of its type (from `type`, what it
  * extends, or its name), without those it already has. Without a known type, `type` and `extends`.
  * @param {TextDocument} document
@@ -227,8 +267,7 @@ function propertyCompletion(document, position, site) {
 		return null;
 	}
 
-	const extended = context.extends === undefined ? null : extend({ extends: context.extends }, blueprintFinder(site));
-	const type = context.type ?? extended?.type ?? context.name;
+	const type = typeOfField(context, site);
 	const options = [
 		{ name: 'type', type: 'string', description: 'The field type' },
 		{ name: 'extends', type: 'string', description: 'A blueprint whose props this field takes over' },
@@ -737,7 +776,11 @@ connection.onCompletion(({ textDocument, position }) => {
 	const site = document ? siteFor(document.uri) : null;
 
 	if (site !== null && isBlueprint(document) === true) {
-		const items = typeCompletion(document, position) ?? extendsCompletion(document, position, site) ?? templateCompletion(document, position, site) ?? propertyCompletion(document, position, site);
+		// `create:` of a pagelist takes templates or false
+		const templates = templateCompletion(document, position, site);
+		const values = valueCompletion(document, position, site);
+		const both = templates === null && values === null ? null : [...templates ?? [], ...values ?? []];
+		const items = typeCompletion(document, position) ?? extendsCompletion(document, position, site) ?? both ?? propertyCompletion(document, position, site);
 
 		if (items !== null) {
 			return items;

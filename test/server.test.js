@@ -428,3 +428,28 @@ test('completes the fields of the site, a block and pages in a snippet', async (
 	const other = openPhp('snippets/m-card.php', '<?= $this-> ?>');
 	assert.deepEqual(await request('textDocument/completion', { textDocument: { uri: other.uri }, position: other.position('$this->', 7) }), []);
 });
+
+test('completes true, false and null for an option', async () => {
+	const text = 'fields:\n  title:\n    type: text\n    translate: \n    counter: f\n    label: \n  list:\n    type: pagelist\n    create: \n';
+	const uri = pathToFileURL(`${project}/public/site/blueprints/pages/options.yml`).href;
+	const at = (needle) => {
+		const lines = text.slice(0, text.indexOf(needle) + needle.length).split('\n');
+		return { line: lines.length - 1, character: lines.at(-1).length };
+	};
+
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'yaml', version: 1, text } } });
+
+	const translate = await request('textDocument/completion', { textDocument: { uri }, position: at('translate: ') });
+	assert.deepEqual(translate.map((item) => [item.label, item.detail]), [['true', 'default'], ['false', undefined], ['null', undefined]]);
+
+	const counter = await request('textDocument/completion', { textDocument: { uri }, position: at('counter: f') });
+	assert.equal(counter[0].textEdit.range.start.character, 13);
+
+	// A string option has no literal values; null alone would fit almost every option
+	assert.deepEqual(await request('textDocument/completion', { textDocument: { uri }, position: at('label: ') }), []);
+
+	// create: takes templates or false
+	const create = (await request('textDocument/completion', { textDocument: { uri }, position: at('create: ') })).map((item) => item.label);
+	assert.ok(create.includes('project'));
+	assert.deepEqual(create.slice(-3), ['true', 'false', 'null']);
+});
