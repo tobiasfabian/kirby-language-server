@@ -48,6 +48,17 @@ test('ignores URLs and generated files', () => {
 	assert.deepEqual(names(`<?= svg('assets/images/symbol-' . $name . '.svg') ?>`), []);
 });
 
+test('finds template names', () => {
+	assert.deepEqual(names(`$page->children()->template('project')`), [['template', 'project']]);
+	assert.deepEqual(names(`$pages->notTemplate(['error', 'home'])`), [['template', 'error', 'home']]);
+	assert.deepEqual(names(`$page->changeTemplate('note')`), [['template', 'note']]);
+	assert.deepEqual(names(`$pages->filterBy('template', 'project') $pages->filterBy('intendedTemplate', 'in', ['a', 'b'])`), [['template', 'project'], ['template', 'a', 'b']]);
+	assert.deepEqual(names(`query: page.children.template("project")`), [['template', 'project']]);
+	assert.deepEqual(names(`public function template(): Template`), []);
+	assert.deepEqual(names(`I18n::template('roomle.dimension', null, [])`), []);
+	assert.deepEqual(names(`$pages->filterBy('title', 'project')`), []);
+});
+
 test('ignores names built at runtime', () => {
 	assert.deepEqual(names(`snippet('blocks/' . $block->type())`), []);
 	assert.deepEqual(names(`snippet($name)`), []);
@@ -84,6 +95,9 @@ test('detects the cursor inside a name', () => {
 
 	const translation = `<?= t('project.`;
 	assert.deepEqual(completionContext(translation, translation.length), { kind: 'translation', fn: 't', prefix: 'project.', start: translation.length - 8 });
+
+	const template = `$pages->filterBy('template', 'in', ['project', 'no`;
+	assert.deepEqual(completionContext(template, template.length), { kind: 'template', fn: 'filterBy', prefix: 'no', start: template.length - 2 });
 
 	const asset = `<?= hashedUrl('/assets/c`;
 	assert.deepEqual(completionContext(asset, asset.length), { kind: 'asset', fn: 'hashedUrl', prefix: '/assets/c', start: asset.length - 9 });

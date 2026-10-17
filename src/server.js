@@ -11,9 +11,9 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { blueprintReferences, extendsContext, fieldTypes, isFieldType, referenceAt, typeContext } from './blueprints.js';
+import { blueprintReferences, extendsContext, fieldTypes, isFieldType, referenceAt, templateSlots, typeContext } from './blueprints.js';
 import { completionContext, findCalls, nameAt, propsContext } from './calls.js';
-import { collectionSignature, findAsset, findSites, listBlueprints, listCollections, listDocroot, listSnippets, listTranslations, snippetProps, snippetVariables } from './project.js';
+import { collectionSignature, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listDocroot, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -55,16 +55,17 @@ function siteFor(uri) {
 }
 
 /**
- * Reads something about a site, again at most every two seconds
+ * Reads something about a site, again at most every two seconds (or `ttl` milliseconds)
  * @template T
  * @param {string} key
  * @param {() => T} read
+ * @param {number} [ttl]
  * @returns {T}
  */
-function cached(key, read) {
+function cached(key, read, ttl = 2000) {
 	const entry = cache.get(key);
 
-	if (entry !== undefined && Date.now() - entry.time < 2000) {
+	if (entry !== undefined && Date.now() - entry.time < ttl) {
 		return entry.value;
 	}
 
@@ -159,9 +160,7 @@ function extendsCompletion(document, position, site) {
 	const range = { start: document.positionAt(context.start), end: position };
 
 	// At the top of a blueprint, its own folder fits: pages/… in pages/project.yml
-	const file = fileURLToPath(document.uri);
-	const own = [...blueprints].find(([, entry]) => entry.file === file)?.[0];
-	const folder = context.folder ?? (own?.includes('/') ? own.split('/')[0] : null);
+	const folder = context.folder ?? ownFolder(document, site);
 
 	return [...blueprints].map(([name, entry]) => ({
 		label: name,
@@ -174,11 +173,140 @@ function extendsCompletion(document, position, site) {
 }
 
 /**
+ * The folder of the blueprint a document is, e.g. `pages` for `pages/project.yml`
+ * @param {TextDocument} document
+ * @param {string} site
+ * @returns {string | null}
+ */
+function ownFolder(document, site) {
+	const file = fileURLToPath(document.uri);
+	const name = [...entriesOf(site, 'blueprint')].find(([, entry]) => entry.file === file)?.[0];
+
+	return name?.includes('/') ? name.split('/')[0] : null;
+}
+
+/**
+ * The template slots of a blueprint
+ * @param {TextDocument} document
+ * @param {string} site
+ */
+function slotsOf(document, site) {
+	return templateSlots(document.getText(), blueprintFinder(site), ownFolder(document, site) === 'files' ? 'files' : 'pages');
+}
+
+/**
  * The blueprints of a site, and whether all of them could be read
  * @param {string} site
  */
 function blueprintsOf(site) {
 	return cached('blueprints:' + site, () => listBlueprints(site));
+}
+
+/**
+ * A function that returns the content of a blueprint by name, for following `extends`
+ * @param {string} site
+ * @returns {(name: string) => Record<string, any> | null}
+ */
+function blueprintFinder(site) {
+	const blueprints = entriesOf(site, 'blueprint');
+
+	return (name) => {
+		const entry = blueprints.get(name);
+		return entry === undefined ? null : cached(`blueprint-content:${entry.file}:${entry.line}`, () => readBlueprint(entry));
+	};
+}
+
+/**
+ * @typedef {{ blueprint?: import('./project.js').Entry, template?: import('./project.js').Entry, content?: import('./project.js').Entry }} Template
+ */
+
+/**
+ * The template names of a site with what defines them: for `pages` the page
+ * blueprints, the templates in `site/templates` (or of plugins) and the templates
+ * pages in the content folder use; for `files` the file blueprints
+ * @param {string} site
+ * @param {'pages' | 'files'} folder
+ * @returns {Map<string, Template>}
+ */
+function templatesOf(site, folder) {
+	return cached(`templates-${folder}:${site}`, () => {
+		const templates = new Map();
+
+		for (const [name, blueprint] of entriesOf(site, 'blueprint')) {
+			const template = name.slice(folder.length + 1);
+
+			if (name.startsWith(folder + '/') === true && template.includes('/') === false) {
+				templates.set(template, { blueprint });
+			}
+		}
+
+		if (folder === 'pages') {
+			for (const [name, template] of listTemplates(site)) {
+				templates.set(name, { ...templates.get(name), template });
+			}
+
+			// Reading the content folder takes a while on big sites
+			for (const [name, content] of cached('content-templates:' + site, () => listContentTemplates(site), 60000)) {
+				templates.set(name, { ...templates.get(name), content });
+			}
+		}
+
+		return templates;
+	});
+}
+
+/**
+ * What to open and describe for a template: its blueprint, else its template file, else a content file using it
+ * @param {Template | undefined} template
+ */
+function templateEntry(template) {
+	return template?.blueprint ?? template?.template ?? template?.content;
+}
+
+/**
+ * Completion items for template names
+ * @param {Map<string, Template>} templates
+ * @param {string} site
+ * @param {{ start: import('vscode-languageserver').Position, end: import('vscode-languageserver').Position }} range
+ * @param {string} [order] sorts the names before the others (`0` or `1`)
+ */
+function templateItems(templates, site, range, order = '0') {
+	return [...templates].map(([name, template]) => ({
+		label: name,
+		kind: CompletionItemKind.File,
+		detail: origin(templateEntry(template), site),
+		documentation: { kind: MarkupKind.Markdown, value: describe('template', name, templateEntry(template), site) },
+		filterText: name,
+		// Kirby's own defaults last
+		sortText: order + (templateEntry(template).source === 'kirby' ? '1' : '0') + name,
+		textEdit: { range, newText: name },
+	}));
+}
+
+/**
+ * The template slot at a position in a blueprint, if there is one
+ * @param {TextDocument} document
+ * @param {number} offset
+ * @param {string} site
+ */
+function templateSlotAt(document, offset, site) {
+	return slotsOf(document, site).find(({ start, end }) => offset >= start && offset <= end) ?? null;
+}
+
+/**
+ * Completion for a template name in a blueprint: `template:` of a pagelist and so on
+ * @param {TextDocument} document
+ * @param {{ line: number, character: number }} position
+ * @param {string} site
+ */
+function templateCompletion(document, position, site) {
+	const slot = templateSlotAt(document, document.offsetAt(position), site);
+
+	if (slot === null) {
+		return null;
+	}
+
+	return templateItems(templatesOf(site, slot.folder), site, { start: document.positionAt(slot.start), end: position });
 }
 
 /**
@@ -206,6 +334,14 @@ function entriesOf(site, kind) {
 
 	if (kind === 'blueprint') {
 		return blueprintsOf(site).blueprints;
+	}
+
+	// Page and file templates; for pages the template file wins (it's what PHP code is about)
+	if (kind === 'template') {
+		return cached('template:' + site, () => new Map([
+			...[...templatesOf(site, 'files')].map(([name, { blueprint }]) => [name, blueprint]),
+			...[...templatesOf(site, 'pages')].map(([name, template]) => [name, template.template ?? templateEntry(template)]),
+		]));
 	}
 
 	return cached(kind + ':' + site, () => kind === 'snippet' ? listSnippets(site) : listCollections(site));
@@ -243,6 +379,7 @@ function origin(entry, site) {
 		plugin: `plugin ${entry.plugin} · ${file}`,
 		config: `config · ${file}`,
 		kirby: 'Kirby core',
+		content: file,
 	}[entry.source];
 }
 
@@ -254,6 +391,14 @@ function origin(entry, site) {
  * @param {string} site
  */
 function describe(kind, name, entry, site) {
+	if (kind === 'template') {
+		const page = templatesOf(site, 'pages').get(name);
+		const file = templatesOf(site, 'files').get(name);
+		const places = [['blueprint', page?.blueprint], ['template', page?.template], ['used by', page?.content], ['file blueprint', file?.blueprint]];
+
+		return [`**${name}**`, '', ...places.filter(([, place]) => place !== undefined).map(([label, place]) => `- ${label}: ${origin(place, site)}`)].join('\n');
+	}
+
 	const lines = [`**${name}** · ${origin(entry, site)}`];
 
 	if (kind === 'asset' || kind === 'blueprint') {
@@ -283,9 +428,21 @@ function lookup(textDocument, position) {
 	const document = documents.get(textDocument.uri);
 	const site = document ? siteFor(document.uri) : null;
 	const offset = document?.offsetAt(position);
-	const reference = site && isBlueprint(document) ? referenceAt(document.getText(), offset) : null;
-	const name = site === null ? null : reference === null ? nameAt(document.getText(), offset) : { kind: 'blueprint', ...reference };
-	const entry = name === null ? undefined : name.kind === 'asset' ? assetEntry(site, name.name) : entriesOf(site, name.kind).get(name.name);
+	const blueprint = site !== null && isBlueprint(document) === true;
+	const reference = blueprint ? referenceAt(document.getText(), offset) : null;
+	const slot = blueprint && reference === null ? templateSlotAt(document, offset, site) : null;
+	let name = site === null ? null : nameAt(document.getText(), offset);
+	let entry;
+
+	if (reference !== null) {
+		name = { kind: 'blueprint', ...reference };
+		entry = entriesOf(site, 'blueprint').get(reference.name);
+	} else if (slot?.name) {
+		name = { kind: 'template', ...slot };
+		entry = templateEntry(templatesOf(site, slot.folder).get(slot.name));
+	} else if (name !== null) {
+		entry = name.kind === 'asset' ? assetEntry(site, name.name) : entriesOf(site, name.kind).get(name.name);
+	}
 
 	return entry === undefined ? null : { document, site, name, entry };
 }
@@ -329,7 +486,31 @@ function blueprintDiagnostics(document, site) {
 }
 
 /**
- * Warns about calls whose snippet, collection, translation or file doesn't exist,
+ * A warning for a page template that doesn't exist, only a hint if a plugin registers
+ * blueprints in a way that couldn't be read. A file template without a blueprint is
+ * only a hint, too: Kirby then uses `files/default`.
+ * @param {TextDocument} document
+ * @param {string} site
+ * @param {{ name: string, start: number, end: number }} name
+ * @param {'pages' | 'files' | null} folder null for PHP code, where it's not clear whether it's about pages or files
+ */
+function templateDiagnostic(document, site, { name, start, end }, folder) {
+	const message = {
+		pages: `Template “${name}” not found: no blueprint pages/${name}, no template ${name}.php and no page that uses it.`,
+		files: `File template “${name}” has no blueprint files/${name}. Kirby uses files/default.`,
+	}[folder] ?? `Template “${name}” not found: no blueprint pages/${name} or files/${name}, no template ${name}.php and no page that uses it.`;
+	const { complete } = blueprintsOf(site);
+
+	return {
+		severity: complete === true && folder !== 'files' ? DiagnosticSeverity.Warning : DiagnosticSeverity.Information,
+		range: { start: document.positionAt(start), end: document.positionAt(end) },
+		message: complete === true ? message : message + ' (Some plugins register blueprints in a way that couldn’t be read.)',
+		source: 'Kirby',
+	};
+}
+
+/**
+ * Warns about calls whose snippet, collection, translation, template or file doesn't exist,
  * and in blueprints about missing blueprints
  * @param {TextDocument} document
  */
@@ -345,6 +526,14 @@ function validate(document) {
 
 	for (const call of findCalls(document.getText())) {
 		let severity = DiagnosticSeverity.Warning;
+
+		// Every template of a list must exist
+		if (call.kind === 'template') {
+			const templates = entriesOf(site, 'template');
+			diagnostics.push(...call.names.filter(({ name }) => templates.has(name) === false).map((name) => templateDiagnostic(document, site, name, null)));
+			continue;
+		}
+
 		const exists = call.kind === 'asset'
 			? findAsset(site, call.names[0].name) !== null
 			: call.names.some(({ name }) => entriesOf(site, call.kind).has(name));
@@ -392,6 +581,12 @@ function validate(document) {
 
 	if (isBlueprint(document) === true) {
 		diagnostics.push(...blueprintDiagnostics(document, site));
+
+		for (const slot of slotsOf(document, site)) {
+			if (slot.name && templatesOf(site, slot.folder).has(slot.name) === false) {
+				diagnostics.push(templateDiagnostic(document, site, slot, slot.folder));
+			}
+		}
 	}
 
 	connection.sendDiagnostics({ uri: document.uri, diagnostics });
@@ -437,7 +632,7 @@ connection.onCompletion(({ textDocument, position }) => {
 	const site = document ? siteFor(document.uri) : null;
 
 	if (site !== null && isBlueprint(document) === true) {
-		const items = typeCompletion(document, position) ?? extendsCompletion(document, position, site);
+		const items = typeCompletion(document, position) ?? extendsCompletion(document, position, site) ?? templateCompletion(document, position, site);
 
 		if (items !== null) {
 			return items;
@@ -471,6 +666,17 @@ connection.onCompletion(({ textDocument, position }) => {
 
 	if (context.kind === 'asset') {
 		return assetCompletion(document, position, site, context);
+	}
+
+	// Templates of pages, or of files for $page->files()->template('…')
+	if (context.kind === 'template') {
+		const range = { start: document.positionAt(context.start), end: position };
+		const line = document.getText({ start: { line: position.line, character: 0 }, end: position });
+		const files = /\b(?:files|images|documents|videos|audio|code)\(\)|\$\w*(?:file|image)/i.test(line);
+		const pages = templateItems(templatesOf(site, 'pages'), site, range, files ? '1' : '0');
+		const fileItems = templateItems(templatesOf(site, 'files'), site, range, files ? '0' : '1').filter(({ label }) => templatesOf(site, 'pages').has(label) === false);
+
+		return [...pages, ...fileItems];
 	}
 
 	const range = { start: document.positionAt(context.start), end: position };

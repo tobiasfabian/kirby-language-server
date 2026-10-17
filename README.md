@@ -9,13 +9,14 @@ For `snippet('…')`, `collection('…')` and `t('…')`/`tt('…')`/`tc('…')`
 	- collections from `site/collections`, plugins and `'extensions'` in the config, with their signature
 	- translation keys from `site/languages`, plugins and the config, then Kirby's own from `kirby/i18n/translations`, with their text in each language
 - **Completion of `type:`** in blueprints: Kirby 6 field types, with `pages`, `files` and `users` as deprecated aliases (`src/blueprints.js`)
+- **Template names** in blueprints (`template`, `templates`, `templatesIgnore` and `create` of a `pagelist`, `template` of a `filelist`, `uploads` of a `filepicker` or `textarea`, `options: changeTemplate`) and in PHP (`->template('…')`, `->notTemplate('…')`, `->changeTemplate('…')`, `filterBy('template', …)`): completion, a warning if there's no blueprint, no template file and no page in the content folder that uses it (only a hint for file templates, where Kirby falls back to `files/default`), Jump to Definition and hover.
 - **`extends:`** in blueprints, and the shorthand `seo: fields/seo` in `fields`, `tabs` and `sections`: completion of the blueprints from `site/blueprints`, plugins, the config and Kirby (those of the fitting folder first), a warning if the blueprint doesn't exist (only a hint if a plugin registers blueprints in a way that can't be read), Jump to Definition and hover. `intro: textarea` is flagged too: Kirby reads it as `extends`, not as the type.
 - **Snippet variables**: in `snippet('m-card', ['…` the keys the snippet expects, with type and default
 - **File paths** in `hashedUrl('…')`, `asset('…')`, `svg('…')`, `css('…')`, `js('…')` and `url('assets/…')`: completion of the files and folders in the docroot (the folder of Kirby's `index.php`), a warning if the file doesn't exist. URLs, `@auto` and files in `media/` aren't checked.
 - **Jump to Definition** to the file (or the line of a collection defined as a closure, or of a translation key)
 - **Hover** with the same information as the completion
 - **Code lenses** with each snippet's or collection's origin above its line (not shown in Nova)
-- **Warnings** for snippets, collections, translation keys, files and blueprints that don't exist. `t('key', 'Fallback')` isn't flagged, and Kirby's own keys (`t('save')`) are known. If a plugin loads translations at runtime, missing keys are only a hint.
+- **Warnings** for snippets, collections, translation keys, files, blueprints and templates that don't exist. `t('key', 'Fallback')` isn't flagged, and Kirby's own keys (`t('save')`) are known. If a plugin loads translations at runtime, missing keys are only a hint.
 
 In Nova, Jump to Definition is the command **Open Referenced File** (⌃⌥⌘O). While Nova's built-in PHP language server (Intelephense) is on, Nova asks only that server for hover and ⌘-click. Without it, hover works but ⌘-click still doesn't jump; code lenses never appear. The completion list shows the same information as the hover.
 
@@ -41,10 +42,10 @@ The extension needs Node.js 18 or newer. It looks for `node` through the login s
 
 ```
 src/
-├── blueprints.js positions in blueprints, field types for type:, extends
-├── calls.js      finds snippet(), collection(), t() calls and file paths
+├── blueprints.js positions in blueprints, field types for type:, extends, template names
+├── calls.js      finds snippet(), collection(), t(), template() calls and file paths
 ├── php.js        reads what plugins and the config register
-├── project.js    reads snippets, collections, translations, blueprints and the docroot
+├── project.js    reads snippets, collections, translations, blueprints, templates and the docroot
 └── server.js     the language server
 Kirby.novaextension/
 ├── extension.json
@@ -62,6 +63,5 @@ The same pattern (read the project, complete, jump, warn) fits more of Kirby:
 - thumb presets in `->thumb('…')` and `->srcset('…')`
 - translation keys missing in some of the languages
 - `option('…')`
-- template names in blueprints
 - field types registered by plugins
 - site methods from `*-methods.stub.php`

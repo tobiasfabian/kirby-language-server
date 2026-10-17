@@ -18,7 +18,7 @@ const KIRBY_BLOCKS = ['code', 'gallery', 'heading', 'image', 'line', 'list', 'ma
  * @typedef {object} Entry
  * @property {string} file
  * @property {number} line 0-based line where it's defined
- * @property {'site' | 'plugin' | 'config' | 'kirby'} source
+ * @property {'site' | 'plugin' | 'config' | 'kirby' | 'content'} source
  * @property {string} [plugin] folder name of the plugin
  * @property {boolean} [inline] defined in PHP code (a blueprint as an array or closure), not in a file of its own
  */
@@ -104,16 +104,16 @@ function phpFiles(folder, extension = '.php') {
 }
 
 /**
- * Reads the snippets, collections and blueprints a plugin (`index.php`) or the config
+ * Reads the snippets, collections, templates and blueprints a plugin (`index.php`) or the config
  * (`config.php`, under `'extensions'`) registers. A list may also come from a file
  * (`'blueprints' => require __DIR__ . '/blueprints.php'`).
  * `complete` is false if the blueprints couldn't be read.
  * @param {string} file
  * @param {'plugin' | 'config'} type
- * @returns {Record<'snippets' | 'collections' | 'blueprints', { name: string, file: string, line: number, inline?: boolean }[]> & { complete: boolean }}
+ * @returns {Record<'snippets' | 'collections' | 'templates' | 'blueprints', { name: string, file: string, line: number, inline?: boolean }[]> & { complete: boolean }}
  */
 function registered(file, type) {
-	const result = { snippets: [], collections: [], blueprints: [], complete: true };
+	const result = { snippets: [], collections: [], templates: [], blueprints: [], complete: true };
 	const code = read(file);
 
 	if (code === null) {
@@ -139,7 +139,7 @@ function registered(file, type) {
 		entries = arrayEntries(code, extensions.valueStart);
 	}
 
-	for (const kind of ['snippets', 'collections', 'blueprints']) {
+	for (const kind of ['snippets', 'collections', 'templates', 'blueprints']) {
 		const entry = entries.find(({ key }) => key === kind);
 
 		// Mentioned, but not where it was expected (e.g. in `array(…)` syntax)
@@ -685,4 +685,79 @@ export function readBlueprint(entry) {
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * Lists the templates of a site: `site/templates/*.php` and those registered by
+ * plugins or under `'extensions'` in the config. Content representations
+ * (`project.json.php`) and email templates (`emails/…`) are left out.
+ * @param {string} site
+ * @returns {Map<string, Entry>}
+ */
+export function listTemplates(site) {
+	const templates = new Map();
+
+	for (const plugin of plugins(site)) {
+		for (const { name, file, line } of registered(path.join(site, 'plugins', plugin, 'index.php'), 'plugin').templates) {
+			templates.set(name, { file, line, source: 'plugin', plugin });
+		}
+	}
+
+	for (const { name, file, line } of registered(path.join(site, 'config', 'config.php'), 'config').templates) {
+		templates.set(name, { file, line, source: 'config' });
+	}
+
+	for (const { name, file } of phpFiles(path.join(site, 'templates'))) {
+		templates.set(name, { file, line: 0, source: 'site' });
+	}
+
+	return new Map([...templates].filter(([name]) => /[./]/.test(name) === false));
+}
+
+/**
+ * The templates that pages in the content folder use, from the names of their
+ * content files (`project.txt`, `project.de.txt`). A page may use a template
+ * that has neither a blueprint nor a template file, like `error`.
+ * File meta data (`photo.jpg.txt`) and `site.txt` are left out.
+ * @param {string} site
+ * @returns {Map<string, Entry>}
+ */
+export function listContentTemplates(site) {
+	const templates = new Map();
+	const root = [path.join(path.dirname(site), 'content'), path.join(findDocroot(site), 'content')].find((folder) => fs.existsSync(folder));
+
+	/** @param {string} folder */
+	function walk(folder) {
+		let entries;
+
+		try {
+			entries = fs.readdirSync(folder, { withFileTypes: true });
+		} catch {
+			return;
+		}
+
+		for (const entry of entries) {
+			if (entry.name.startsWith('.') === true) {
+				continue;
+			}
+
+			if (entry.isDirectory() === true) {
+				walk(path.join(folder, entry.name));
+				continue;
+			}
+
+			// The language code, if any, then the template
+			const name = entry.name.endsWith('.txt') ? entry.name.slice(0, -4).replace(/\.[a-z]{2}(?:[-_][a-z]{2,4})?$/i, '') : '';
+
+			if (name !== '' && name.includes('.') === false && (folder !== root || name !== 'site') && templates.has(name) === false) {
+				templates.set(name, { file: path.join(folder, entry.name), line: 0, source: 'content' });
+			}
+		}
+	}
+
+	if (root !== undefined) {
+		walk(root);
+	}
+
+	return templates;
 }

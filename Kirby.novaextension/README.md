@@ -1,4 +1,4 @@
-**Kirby Language Server** helps with snippets, collections, translations, assets and blueprints in [Kirby CMS](https://getkirby.com) 6 projects.
+**Kirby Language Server** helps with snippets, collections, translations, assets, templates and blueprints in [Kirby CMS](https://getkirby.com) 6 projects.
 
 ## What it does
 
@@ -17,7 +17,10 @@ File paths in `hashedUrl('`, `asset('`, `svg('`, `css('`, `js('` and `url('asset
 In blueprints:
 
 - `type: ` offers Kirby 6's field types, such as `pagelist` and `pagepicker`. `pages`, `files` and `users` are shown as deprecated aliases.
+- Template names in `template:`/`templates:`/`create:` of a `pagelist`, `template:` of a `filelist`, `uploads:` of a `filepicker` or `textarea` and `options: changeTemplate:` offer the page (or file) templates: from blueprints, `site/templates`, plugins, and the pages in the content folder. Templates that don't exist anywhere are marked; for file templates without a blueprint it's only a hint, because Kirby falls back to `files/default`.
 - `extends: ` and the shorthand `seo: fields/seo` (in `fields`, `tabs` and `sections`) offer the project's blueprints, those of the fitting folder first. Blueprints that don't exist are marked; `intro: textarea` too, because Kirby reads it as `extends` and not as the type. ⌃⌥⌘O opens the blueprint.
+
+In PHP, `->template('…')`, `->notTemplate('…')`, `->changeTemplate('…')` and `filterBy('template', …)` complete and check template names the same way.
 
 Fallbacks such as `snippet(['m-card-project', 'm-card'])` are understood. Names built at runtime, like `snippet('blocks/' . $block->type())`, are not checked.
 

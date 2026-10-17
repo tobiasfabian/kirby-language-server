@@ -2,7 +2,7 @@
 	"identifier": "tobiasfabian.kirby",
 	"name": "Kirby",
 	"organization": "Tobias Fabian",
-	"description": "Completion, navigation and warnings for snippets, collections, translations, assets and blueprints in Kirby CMS 6 projects.",
+	"description": "Completion, navigation and warnings for snippets, collections, translations, assets, templates and blueprints in Kirby CMS 6 projects.",
 	"version": "0.1.0",
 	"license": "MIT",
 	"repository": "https://github.com/tobiasfabian/kirby-language-server",

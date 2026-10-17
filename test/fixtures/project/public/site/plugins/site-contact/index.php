@@ -13,6 +13,9 @@ App::plugin('site/contact', [
 	'snippets' => [
 		'm-form-contact' => __DIR__ . '/snippets/m-form-contact.php',
 	],
+	'templates' => [
+		'contact' => __DIR__ . '/templates/contact.php',
+	],
 	'collections' => [
 		'contact-forms' => function () {
 			return []; // 'not-a-collection' => 'x'

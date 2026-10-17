@@ -1,0 +1,21 @@
+title: Projects
+
+options:
+  changeTemplate:
+    - projects
+    - missing-change
+
+fields:
+  drafts:
+    type: pagelist
+    templates:
+      - project
+      - note
+      - missing-page
+    create: project
+  gallery:
+    type: filelist
+    template: image
+  cover:
+    extends: fields/cover
+    uploads: missing-file

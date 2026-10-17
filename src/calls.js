@@ -1,7 +1,8 @@
 /**
- * Finds `snippet()`, `collection()`, translation calls (`t()`, `tt()`, `tc()`)
- * and file paths (`hashedUrl()`, `url()`, `asset()`, `svg()`, `css()`, `js()`)
- * in PHP code and blueprints.
+ * Finds `snippet()`, `collection()`, translation calls (`t()`, `tt()`, `tc()`),
+ * file paths (`hashedUrl()`, `url()`, `asset()`, `svg()`, `css()`, `js()`)
+ * and template names (`->template()`, `->notTemplate()`, `->changeTemplate()`,
+ * `filterBy('template', …)`) in PHP code and blueprints.
  *
  * Only literal names count: `snippet('m-card')`, the fallback form
  * `snippet(['m-card-project', 'm-card'])`, `collection('projects')`
@@ -10,9 +11,20 @@
  * Names built at runtime, like `snippet('blocks/' . $block->type())`, are left alone.
  */
 
-/** @typedef {'snippet' | 'collection' | 'translation' | 'asset'} Kind */
+/** @typedef {'snippet' | 'collection' | 'translation' | 'asset' | 'template'} Kind */
 
-const CALL = /\b(snippet|collection|t|tt|tc|hashedUrl|url|asset|svg|css|js)\(\s*/g;
+// `filterBy('template', 'in', [...])` has no group for the function
+const CALL = /\b(snippet|collection|t|tt|tc|hashedUrl|url|asset|svg|css|js|template|notTemplate|changeTemplate)\(\s*|\b(?:filterBy|filter)\(\s*(['"])(?:template|intendedTemplate)\2\s*,\s*(?:(['"])(?:==|!=|in|not in)\3\s*,\s*)?/g;
+
+// The part of a line before the cursor, when the cursor is in a name; `list` allows `['a', 'b', '`
+const LIST = String.raw`(?:\[\s*(?:['"][\w./-]*['"]\s*,\s*)*)?`;
+const CONTEXTS = [
+	new RegExp(String.raw`\b(?<fn>snippet)\(\s*${LIST}['"](?<prefix>[\w./-]*)$`),
+	/\b(?<fn>collection|t|tt|tc)\(\s*['"](?<prefix>[\w./:-]*)$/,
+	/\b(?<fn>hashedUrl|url|asset|svg|css|js)\(\s*['"](?<prefix>[\w./@-]*)$/,
+	new RegExp(String.raw`(?:->|\.)(?<fn>template|notTemplate|changeTemplate)\(\s*${LIST}['"](?<prefix>[\w./-]*)$`),
+	new RegExp(String.raw`\b(?<fn>filterBy|filter)\(\s*(['"])(?:template|intendedTemplate)\2\s*,\s*(?:(['"])(?:==|!=|in|not in)\3\s*,\s*)?${LIST}['"](?<prefix>[\w./-]*)$`),
+];
 const NAME_CHARACTERS = /[\w./:@-]/;
 const KINDS = {
 	snippet: 'snippet',
@@ -27,6 +39,12 @@ const KINDS = {
 	svg: 'asset',
 	css: 'asset',
 	js: 'asset',
+	// Page or file templates
+	template: 'template',
+	notTemplate: 'template',
+	changeTemplate: 'template',
+	filterBy: 'template',
+	filter: 'template',
 };
 
 /**
@@ -94,13 +112,18 @@ export function findCalls(text) {
 	const calls = [];
 
 	for (const match of text.matchAll(CALL)) {
-		const fn = match[1];
+		const fn = match[1] ?? 'filterBy';
 		const kind = /** @type {Kind} */ (KINDS[fn]);
 		let index = match.index + match[0].length;
 		const names = [];
 
-		// Only snippet() takes a list of fallbacks
-		if (kind === 'snippet' && text[index] === '[') {
+		// Template methods are called on pages or files (`->template(`, `.template(` in queries), not `I18n::template(`
+		if (kind === 'template' && fn !== 'filterBy' && /(?:->|\.)$/.test(text.slice(0, match.index)) === false) {
+			continue;
+		}
+
+		// snippet() takes a list of fallbacks, template() a list of templates
+		if ((kind === 'snippet' || kind === 'template') && text[index] === '[') {
 			index = skipSpace(text, index + 1);
 
 			while (index < text.length) {
@@ -158,17 +181,13 @@ export function findCalls(text) {
 export function completionContext(text, offset) {
 	const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
 	const before = text.slice(lineStart, offset);
-	const match = before.match(/\bsnippet\(\s*(?:\[\s*(?:(['"])[\w./-]*\1\s*,\s*)*)?(['"])([\w./-]*)$/)
-		?? before.match(/\b(collection|t|tt|tc)\(\s*(['"])([\w./:-]*)$/)
-		?? before.match(/\b(hashedUrl|url|asset|svg|css|js)\(\s*(['"])([\w./@-]*)$/);
+	const match = CONTEXTS.map((pattern) => before.match(pattern)).find((found) => found !== null);
 
-	if (match === null) {
+	if (match === undefined) {
 		return null;
 	}
 
-	const prefix = match[3];
-
-	const fn = KINDS[match[1]] === undefined ? 'snippet' : match[1];
+	const { fn, prefix } = match.groups;
 
 	return { kind: KINDS[fn], fn, prefix, start: offset - prefix.length };
 }

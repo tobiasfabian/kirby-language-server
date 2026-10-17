@@ -139,7 +139,7 @@ test('jumps to a collection defined in a plugin', async () => {
 
 	const [link] = location;
 	assert.equal(fileURLToPath(link.targetUri), `${project}/public/site/plugins/site-contact/index.php`);
-	assert.equal(link.targetSelectionRange.start.line, 16);
+	assert.equal(link.targetSelectionRange.start.line, fs.readFileSync(fileURLToPath(link.targetUri), 'utf8').split('\n').findIndex((line) => line.includes(`'contact-forms'`)));
 });
 
 test('shows the origin above each call', async () => {
@@ -194,13 +194,14 @@ test('jumps to the translation in the default language', async () => {
 test('warns about missing snippets, collections and translations', async () => {
 	const messages = await diagnosticsOf(templateUri);
 
-	assert.equal(messages.length, 6);
+	assert.equal(messages.length, 7);
 	assert.match(messages[0], /Snippet “head” not found/);
 	assert.match(messages[1], /Snippet “m-nav-footer” not found/);
 	assert.match(messages[2], /Collection “missing” not found/);
 	assert.match(messages[3], /Translation “missing.key” not found/);
 	assert.match(messages[4], /Translation “missing.plural” not found/);
 	assert.match(messages[5], /File “assets\/images\/missing.svg” not found/);
+	assert.match(messages[6], /Template “missing-template” not found: no blueprint pages\/missing-template or files\/missing-template, no template missing-template.php and no page that uses it/);
 });
 
 test('checks collections in blueprint queries', async () => {
@@ -313,4 +314,54 @@ test('opens the blueprint a blueprint extends', async () => {
 
 	const hover = await request('textDocument/hover', { textDocument: { uri }, position: position('fields/cover', 3) });
 	assert.equal(hover.contents.value, '**fields/cover** · site/blueprints/fields/cover.yml');
+});
+
+test('warns about templates that don’t exist in blueprints', async () => {
+	const { uri } = openBlueprint('pages/projects');
+	const messages = await diagnosticsOf(uri);
+
+	assert.deepEqual(messages, [
+		'Template “missing-change” not found: no blueprint pages/missing-change, no template missing-change.php and no page that uses it.',
+		'Template “missing-page” not found: no blueprint pages/missing-page, no template missing-page.php and no page that uses it.',
+		'File template “missing-file” has no blueprint files/missing-file. Kirby uses files/default.',
+	]);
+});
+
+test('completes page and file templates in blueprints', async () => {
+	const { uri, position } = openBlueprint('pages/projects');
+	const pages = await request('textDocument/completion', { textDocument: { uri }, position: position('- note', 2) });
+	const labels = pages.map((item) => item.label);
+
+	for (const name of ['project', 'note', 'contact', 'default', 'projects', 'error']) {
+		assert.ok(labels.includes(name), name);
+	}
+
+	assert.equal(labels.includes('image'), false);
+	assert.equal(labels.includes('project.json'), false);
+	assert.match(pages.find((item) => item.label === 'contact').documentation.value, /- blueprint: plugin site-contact/);
+	assert.equal(pages.find((item) => item.label === 'error').detail, 'content/error/error.de.txt');
+
+	const files = await request('textDocument/completion', { textDocument: { uri }, position: position('template: image', 'template: '.length) });
+	assert.deepEqual(files.map((item) => item.label).sort(), ['default', 'image']);
+});
+
+test('opens the blueprint of a template in a blueprint', async () => {
+	const { uri, position } = openBlueprint('pages/projects');
+	const [link] = await request('textDocument/definition', { textDocument: { uri }, position: position('- project\n', 4) });
+
+	assert.equal(fileURLToPath(link.targetUri), `${project}/public/site/blueprints/pages/project.yml`);
+});
+
+test('completes and opens templates in PHP', async () => {
+	const items = await request('textDocument/completion', { textDocument: { uri: templateUri }, position: positionOf(`template(['project`, `template(['`.length) });
+	const sorted = items.sort((a, b) => a.sortText.localeCompare(b.sortText)).map((item) => item.label);
+
+	assert.ok(sorted.includes('note'));
+	assert.ok(sorted.indexOf('note') < sorted.indexOf('image'));
+
+	const files = await request('textDocument/completion', { textDocument: { uri: templateUri }, position: positionOf(`template('image`, `template('`.length) });
+	assert.equal(files.sort((a, b) => a.sortText.localeCompare(b.sortText))[0].label, 'image');
+
+	const [link] = await request('textDocument/definition', { textDocument: { uri: templateUri }, position: positionOf(`'note'`, 2) });
+	assert.equal(fileURLToPath(link.targetUri), `${project}/public/site/templates/note.php`);
 });

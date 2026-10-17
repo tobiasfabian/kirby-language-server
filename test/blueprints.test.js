@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { blueprintReferences, extend, extendsContext, fieldTypes, referenceAt, typeContext } from '../src/blueprints.js';
+import { blueprintReferences, extend, extendsContext, fieldTypes, referenceAt, templateSlots, typeContext } from '../src/blueprints.js';
 
 /**
  * Puts the cursor at `▮`
@@ -128,4 +128,47 @@ test('finds the blueprints a blueprint refers to', () => {
 	assert.equal(text.slice(references[3].start, references[3].end), 'fields/gallery');
 	assert.equal(referenceAt(text, text.indexOf('tabs/seo') + 2)?.name, 'tabs/seo');
 	assert.equal(referenceAt(text, 2), null);
+});
+
+test('finds where a blueprint names templates', () => {
+	const find = (name) => ({ 'sections/drafts': { type: 'pages' }, 'fields/cover': { type: 'files' } })[name] ?? null;
+	const slots = (text) => templateSlots(text, find).map(({ name, folder }) => [name, folder]);
+
+	assert.deepEqual(slots([
+		'options:',
+		'  changeTemplate: [a, b]',
+		'fields:',
+		'  list:',
+		'    type: pagelist',
+		'    templates:',
+		'      - project',
+		'      - "note"',
+		'    templatesIgnore: error',
+		'    create: false',
+		'  images:',
+		'    type: filelist',
+		'    template: image',
+		'  cover:',
+		'    extends: fields/cover',
+		'    uploads: cover',
+		'  text:',
+		'    type: textarea',
+		'    uploads:',
+		'      template: inline',
+		'  picker:',
+		'    type: pagepicker',
+		'    template: nope',
+		'  files:',
+		'    template: nope',
+	].join('\n')), [['a', 'pages'], ['b', 'pages'], ['project', 'pages'], ['note', 'pages'], ['error', 'pages'], ['image', 'files'], ['cover', 'files'], ['inline', 'files']]);
+
+	// A file blueprint changes to other file templates
+	assert.deepEqual(templateSlots('options:\n  changeTemplate:\n    - download', find, 'files').map(({ folder }) => folder), ['files']);
+
+	// Legacy sections: pages and files are the list fields
+	assert.deepEqual(slots('sections:\n  drafts:\n    extends: sections/drafts\n    template: product\n  files:\n    template: image'), [['product', 'pages'], ['image', 'files']]);
+
+	// Nothing typed yet, also in the middle of a blueprint
+	const text = 'fields:\n  list:\n    type: pagelist\n    template: \n    label: List';
+	assert.deepEqual(templateSlots(text, find), [{ name: null, start: text.indexOf('template: ') + 10, end: text.indexOf('template: ') + 10, folder: 'pages' }]);
 });

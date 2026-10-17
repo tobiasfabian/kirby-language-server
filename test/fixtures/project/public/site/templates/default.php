@@ -26,4 +26,7 @@
 	<?= js('@auto') ?>
 	<a href="<?= url('search') ?>"></a>
 	<?= svg('assets/images/missing.svg') ?>
+	<?php $children = $page->children()->template(['project', 'note', 'missing-template']) ?>
+	<?php $images = $page->files()->template('image') ?>
+	<?php $contacts = $site->index()->filterBy('intendedTemplate', 'contact') ?>
 </body>

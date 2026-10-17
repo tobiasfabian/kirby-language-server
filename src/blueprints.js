@@ -326,3 +326,102 @@ export function referenceAt(text, offset) {
 export function isFieldType(name) {
 	return FIELD_TYPES.includes(name) === true || ALIASES[name] !== undefined;
 }
+
+// Where a field takes template names: field type → key → folder of the blueprints
+const TEMPLATE_KEYS = {
+	pagelist: { create: 'pages', template: 'pages', templates: 'pages', templatesIgnore: 'pages' },
+	filelist: { template: 'files' },
+	filepicker: { uploads: 'files' },
+	textarea: { uploads: 'files' },
+};
+
+// Sections are a legacy shortcut for these fields (Kirby 6's Normalizer::$sectionFields)
+const SECTION_TYPES = { pages: 'pagelist', files: 'filelist' };
+
+/**
+ * @typedef {object} TemplateSlot
+ * @property {string | null} name null where nothing is typed yet
+ * @property {number} start
+ * @property {number} end
+ * @property {'pages' | 'files'} folder whose blueprints the names refer to
+ */
+
+/**
+ * The Kirby 6 field type of a map in a blueprint: its `type`, the type of what it
+ * extends, or its name. In `sections`, `pages` and `files` are the list fields.
+ * @param {any} map
+ * @param {readonly any[]} path from yaml's `visit`, ending with the map
+ * @param {(name: string) => Record<string, any> | null} find
+ */
+function fieldTypeOf(map, path, find) {
+	const item = path.at(-2);
+	const name = isPair(item) === true && isScalar(item.key) === true ? item.key.value : null;
+	const props = extend(map.toJSON(), find);
+	const type = isObject(props) === true && typeof props.type === 'string' ? props.type : name;
+	const container = path.at(-4);
+
+	if (isPair(container) === true && isScalar(container.key) === true && container.key.value === 'sections' && SECTION_TYPES[type] !== undefined) {
+		return SECTION_TYPES[type];
+	}
+
+	return ALIASES[type] ?? type;
+}
+
+/**
+ * Finds where a blueprint names templates: `template`, `templates`, `templatesIgnore`
+ * and `create` of a `pagelist`, `template` of a `filelist`, `uploads` of a `filepicker`
+ * or `textarea`, and `options: changeTemplate` (templates of the blueprint's own kind)
+ * @param {string} text
+ * @param {(name: string) => Record<string, any> | null} find the content of a blueprint by name, for `extends`
+ * @param {'pages' | 'files'} [own] whether the blueprint is for pages or files
+ * @returns {TemplateSlot[]}
+ */
+export function templateSlots(text, find, own = 'pages') {
+	const document = parseDocument(text, { uniqueKeys: false, logLevel: 'silent' });
+	const slots = [];
+	const types = new Map();
+
+	const add = (node, folder) => {
+		if (isScalar(node) === true && node.range !== undefined && (node.value === null || typeof node.value === 'string')) {
+			const start = node.range[0] + (node.type === 'QUOTE_DOUBLE' || node.type === 'QUOTE_SINGLE' ? 1 : 0);
+			slots.push({ name: node.value, start, end: start + (node.value ?? '').length, folder });
+		}
+	};
+
+	const addAll = (node, folder) => (isSeq(node) === true ? node.items : [node]).forEach((item) => add(item, folder));
+
+	visit(document, {
+		Pair(_, pair, path) {
+			const key = isScalar(pair.key) === true ? pair.key.value : null;
+			const map = path.at(-1);
+			const options = path.at(-2);
+
+			// options: changeTemplate (or its alias template) at the top of the blueprint
+			if (path.length === 4 && isPair(options) === true && isScalar(options.key) === true && options.key.value === 'options') {
+				if (key === 'changeTemplate' || key === 'template') {
+					addAll(pair.value, own);
+				}
+
+				return;
+			}
+
+			if (types.has(map) === false) {
+				types.set(map, fieldTypeOf(map, path, find));
+			}
+
+			const folder = TEMPLATE_KEYS[types.get(map)]?.[key];
+
+			if (folder === undefined) {
+				return;
+			}
+
+			if (key === 'uploads' && isMap(pair.value) === true) {
+				add(pair.value.get('template', true), folder);
+			} else {
+				addAll(pair.value, folder);
+			}
+		},
+	});
+
+	return slots;
+}
