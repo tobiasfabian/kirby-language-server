@@ -8,7 +8,8 @@
     "dev": "node ./build.mjs --dev",
     "lint": "eslint .",
     "test": "node --test",
-    "read-kirby": "node ./scripts/read-kirby.mjs"
+    "read-kirby": "node ./scripts/read-kirby.mjs",
+    "package:vscode": "npm run build && cd vscode && ../node_modules/.bin/vsce package --no-dependencies"
   },
   "author": "Tobias Wolf (https://tobiaswolf.me)",
   "license": "MIT",
@@ -21,8 +22,10 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.10.0",
+    "@vscode/vsce": "^4.0.0",
     "esbuild": "0.28.1",
     "eslint": "^10.12.0",
-    "globals": "^17.13.0"
+    "globals": "^17.13.0",
+    "vscode-languageclient": "^10.1.2"
   }
 }

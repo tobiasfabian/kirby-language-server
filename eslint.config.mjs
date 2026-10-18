@@ -5,7 +5,7 @@ import stylistic from '@stylistic/eslint-plugin'
 
 export default defineConfig([
 	{
-		ignores: ["Kirby.novaextension/Server/**"],
+		ignores: ["Kirby.novaextension/Server/**", "vscode/dist/**"],
 	},
 	{
 		files: ["**/*.{js,mjs,cjs}"],

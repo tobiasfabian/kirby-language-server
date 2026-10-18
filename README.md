@@ -1,6 +1,6 @@
 # Kirby Language Server
 
-A [language server](https://microsoft.github.io/language-server-protocol/) for [Kirby CMS](https://getkirby.com) 6 projects, with an extension for [Nova](https://nova.app).
+A [language server](https://microsoft.github.io/language-server-protocol/) for [Kirby CMS](https://getkirby.com) 6 projects, with extensions for [Nova](https://nova.app) and [VS Code](https://code.visualstudio.com).
 
 In PHP files:
 
@@ -53,10 +53,22 @@ nova extension activate Kirby.novaextension
 
 The extension needs Node.js 18 or newer. It looks for `node` through the login shell (nvm and Homebrew work); a different path can be set in the extension settings.
 
+## Use it in VS Code
+
+```bash
+npm install
+npm run package:vscode
+```
+
+This builds `vscode/kirby-language-server-0.1.0.vsix`. Install it with **Extensions → … → Install from VSIX…**. To develop, open the repository in VS Code and press F5: the launch configuration **Kirby extension** builds and starts it in an Extension Development Host.
+
+The server runs in VS Code's own Node.js over IPC, so no separate Node.js is needed. VS Code asks every extension for hover and Go to Definition, so ⌘-click and F12 work next to Intelephense; code lenses are shown, too. For PHP, the extension turns on quick suggestions inside strings, so completions appear while typing `snippet('m-`.
+
 ## Develop
 
-- `npm run dev`: rebuilds the server on every change
-- `npm test`: unit tests for `src/` and a test that talks to the built server over stdio (`npm run build` first)
+- `npm run dev`: rebuilds the server and the VS Code client on every change
+- `npm test`: unit tests for `src/`, a test that talks to the built server over stdio as Nova does, and one over IPC as VS Code does (`npm run build` first)
+- `npm run package:vscode`: builds and packages the VS Code extension
 - `npm run lint`: ESLint
 - `npm run read-kirby -- path/to/kirby`: reads the options of each field type and Kirby's field methods from a Kirby 6 checkout into `src/field-properties.json` and `src/field-methods.json`
 
@@ -76,10 +88,14 @@ Kirby.novaextension/
 ├── extension.json
 ├── Scripts/main.js   finds node and starts the server
 └── Server/server.cjs the bundled server (built, not in git)
+vscode/
+├── package.json      the VS Code extension's manifest
+├── src/extension.js  starts the server over IPC
+└── dist/             the bundled client and server (built, not in git)
 test/
 ```
 
-The language server is plain LSP over stdio, so it can be used in other editors (Zed, VS Code, Neovim) with a small client.
+The language server is plain LSP (over stdio or IPC), so it can be used in other editors (Zed, Neovim) with a small client.
 
 ## Ideas
 

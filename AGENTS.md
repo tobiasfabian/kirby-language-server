@@ -1,10 +1,11 @@
 # AGENTS.md
 
-A language server for Kirby CMS projects (`src/`) and the Nova extension that starts it (`Kirby.novaextension/`).
+A language server for Kirby CMS projects (`src/`) and the extensions that start it: for Nova (`Kirby.novaextension/`) and for VS Code (`vscode/`).
 
 ## Commands
 
-- `npm run build`: bundles `src/server.js` into `Kirby.novaextension/Server/server.cjs`
+- `npm run build`: bundles `src/server.js` into `Kirby.novaextension/Server/server.cjs` and `vscode/dist/server.js`, and the VS Code client into `vscode/dist/extension.js`
+- `npm run package:vscode`: builds `vscode/kirby-language-server-<version>.vsix`
 - `npm test`: unit tests and an LSP test against the built server; build first
 - `npm run lint`: ESLint
 - `npm run read-kirby -- path/to/kirby`: regenerates `src/field-properties.json` (the options of each field type) and `src/field-methods.json` (Kirby's field methods) from a Kirby 6 checkout
@@ -21,6 +22,12 @@ A language server for Kirby CMS projects (`src/`) and the Nova extension that st
 - No false warnings: a warning is only shown for literal names. Names built at runtime are skipped. Registered snippets and collections are read with the small parser in `src/php.js`, which knows the nesting: `'collections'` inside `'api' => [...]` are API collections, not Kirby collections.
 - Translation keys are only reported as missing with a Warning when every source could be read; if a plugin builds its translations at runtime (JSON, YAML), it's an Information instead. Kirby's own keys come from `kirby/i18n/translations/*.json` (the file per site language; es → es_ES.json if there is no es.json) and are offered after the project's keys.
 - Before changing what counts as a call, run the server against a few real projects and check that the warnings it shows are real.
+
+## VS Code
+
+- The client (`vscode/src/extension.js`) starts the same server bundle with `vscode-languageclient` over IPC (`--node-ipc`) in VS Code's own Node.js; `test/vscode.test.js` talks to it that way.
+- Keep features in the server, not in a client: both extensions should behave the same. Only what an editor can't do over LSP belongs in its client (like Nova's Open Referenced File command).
+- `vscode/package.json` is the extension manifest, separate from the repo's `package.json` (which sets `"type": "module"`); the bundles in `vscode/dist/` are CommonJS `.js` files because that folder's `package.json` has no `type`.
 
 ## Nova gotchas
 

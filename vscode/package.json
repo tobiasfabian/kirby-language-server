@@ -1,0 +1,47 @@
+{
+  "name": "kirby-language-server",
+  "displayName": "Kirby Language Server",
+  "description": "Completion, navigation and warnings for snippets, collections, translations, assets, templates and blueprints in Kirby CMS 6 projects.",
+  "version": "0.1.0",
+  "publisher": "tobiasfabian",
+  "author": {
+    "name": "Tobias Wolf",
+    "url": "https://tobiaswolf.me"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tobiasfabian/kirby-language-server"
+  },
+  "bugs": {
+    "url": "https://github.com/tobiasfabian/kirby-language-server/issues"
+  },
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "keywords": [
+    "kirby",
+    "kirby cms",
+    "php",
+    "blueprints",
+    "language server"
+  ],
+  "activationEvents": [
+    "onLanguage:php",
+    "onLanguage:yaml"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configurationDefaults": {
+      "[php]": {
+        "editor.quickSuggestions": {
+          "strings": "on"
+        }
+      }
+    }
+  }
+}
