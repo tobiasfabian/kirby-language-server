@@ -26,7 +26,7 @@ In blueprints:
 
 For all of them:
 
-- **Open Referenced File** (⌃⌥⌘O, or from the command palette) opens the file the name under the cursor refers to: the snippet, collection, file, blueprint or template, for translation keys the line in the language file.
+- **Open Referenced File** (⌃⌥⌘O, or from the command palette) opens the file the name under the cursor refers to: the snippet, collection, file, blueprint or template, for translation keys the line in the language file. On `$page->name()` it opens the method (in the plugin, the config or the model) or the field's line in the blueprint; on `$page->cover()->toFile()` the field method, Kirby's own in Kirby's source.
 - **Warnings** mark names that don't exist.
 	- `t('key', 'Fallback')` with a fallback text isn't flagged. If a plugin loads its translations at runtime (e.g. from JSON files), missing keys are only a hint, because they might come from there.
 	- `intro: textarea` is marked too, because Kirby reads it as `extends` and not as the type.

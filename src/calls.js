@@ -367,3 +367,28 @@ export function variableAt(text, offset) {
 
 	return null;
 }
+
+/**
+ * The method or field name at the cursor in `$page->name(`, `$site->name(`, `$block->name(`
+ * or `$this->name(`, or the field method in `$page->field()->name(`, if there is one
+ * @param {string} text
+ * @param {number} offset
+ * @returns {{ variable: 'page' | 'site' | 'block' | 'this', field?: string, name: string, start: number, end: number } | null}
+ */
+export function memberAt(text, offset) {
+	const start = offset - text.slice(0, offset).match(/\w*$/)[0].length;
+	const end = offset + text.slice(offset).match(/^\w*/)[0].length;
+	const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+	const before = text.slice(lineStart, start);
+	const member = before.match(/\$(page|site|block|this)\s*->\s*$/);
+	const method = member === null ? before.match(/\$(page|site|block|this)\s*->\s*(\w+)\(\s*\)\s*->\s*$/) : null;
+
+	if (start === end || (member ?? method) === null) {
+		return null;
+	}
+
+	const variable = /** @type {any} */ ((member ?? method)[1]);
+	const name = text.slice(start, end);
+
+	return method === null ? { variable, name, start, end } : { variable, field: method[2], name, start, end };
+}

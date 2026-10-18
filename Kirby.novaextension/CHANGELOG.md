@@ -11,5 +11,5 @@
 - Completion of controller variables in templates, with warnings for variables nothing defines
 - Completion of field references (`fields: [intro]`) and block types (`fieldsets`) in blueprints, with warnings for those that don't exist
 - Completion of file paths in `hashedUrl('…')`, `asset('…')`, `svg('…')`, `css('…')`, `js('…')` and `url('assets/…')`
-- Command Open Referenced File (⌃⌥⌘O)
+- Command Open Referenced File (⌃⌥⌘O), also for methods, fields and field methods after `->`
 - Warnings for snippets, collections, translation keys, files, blueprints and templates that don't exist

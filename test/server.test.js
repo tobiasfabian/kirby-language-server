@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -537,4 +538,29 @@ test('doesn’t check field references in partials', async () => {
 	const uri = pathToFileURL(`${project}/public/site/blueprints/tabs/content.yml`).href;
 	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'yaml', version: 1, text: 'label: Content\nfields:\n  - intro\n' } } });
 	assert.deepEqual(await diagnosticsOf(uri), []);
+});
+
+test('opens and describes methods and fields after ->', async () => {
+	const text = '<?= $page->contactForm() ?> <?= $page->year() ?> <?= $page->metatitle() ?> <?= $page->cover()->toPhone() ?> <?= $page->cover()->toFile() ?> <?= $site->footer() ?> <?= $page->children() ?>';
+	const { uri, position } = openPhp('templates/project.php', text);
+	const open = async (needle, shift) => {
+		const [link] = await request('textDocument/definition', { textDocument: { uri }, position: position(needle, shift) }) ?? [];
+		return link === undefined ? null : [path.relative(`${project}/public`, fileURLToPath(link.targetUri)), link.targetSelectionRange.start.line];
+	};
+	const lineOf = (file, needle) => fs.readFileSync(`${project}/public/${file}`, 'utf8').split('\n').findIndex((line) => line.includes(needle));
+
+	assert.deepEqual(await open('contactForm', 2), ['site/plugins/site-contact/index.php', lineOf('site/plugins/site-contact/index.php', `'contactForm'`)]);
+	assert.deepEqual(await open('year', 2), ['site/models/project.php', lineOf('site/models/project.php', 'function year')]);
+	assert.deepEqual(await open('metatitle', 2), ['site/blueprints/tabs/seo.yml', lineOf('site/blueprints/tabs/seo.yml', 'metaTitle:')]);
+	assert.deepEqual(await open('cover()->toPhone', 2), ['site/blueprints/pages/project.yml', lineOf('site/blueprints/pages/project.yml', 'cover:')]);
+	assert.deepEqual(await open('toPhone', 2), ['site/plugins/site-contact/index.php', lineOf('site/plugins/site-contact/index.php', `'toPhone'`)]);
+	assert.deepEqual(await open('toFile', 2), ['kirby/src/Content/FieldMethods.php', lineOf('kirby/src/Content/FieldMethods.php', 'function toFile')]);
+	assert.deepEqual(await open('footer', 2), ['site/blueprints/site.yml', lineOf('site/blueprints/site.yml', 'footer:')]);
+	assert.equal(await open('children', 2), null);
+
+	const method = await request('textDocument/hover', { textDocument: { uri }, position: position('contactForm', 2) });
+	assert.match(method.contents.value, /contactForm\(string \$name = 'default'\): \?Page\n```\nThe contact form of the page/);
+
+	const field = await request('textDocument/hover', { textDocument: { uri }, position: position('metatitle', 2) });
+	assert.match(field.contents.value, /^\*\*metaTitle\*\* · text · pages\/project\n\nsite\/blueprints\/tabs\/seo.yml$/);
 });

@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
@@ -11,8 +12,8 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
-import { completionContext, fieldContext, fieldMethodContext, findCalls, nameAt, propsContext, variableAt, variableContext } from './calls.js';
+import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldKeyOffset, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
+import { completionContext, fieldContext, fieldMethodContext, findCalls, memberAt, nameAt, propsContext, variableAt, variableContext } from './calls.js';
 import { classMethods, closureInfo, collectionSignature, controllerVariables, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listControllers, listDocroot, listMethods, listModels, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
 import { undefinedVariables } from './variables.js';
 
@@ -204,7 +205,7 @@ function fieldsFor(variable, file, site) {
  * @param {'page' | 'site' | 'block' | 'this'} variable
  * @param {string} file
  * @param {string} site
- * @returns {{ name: string, params: string, returns?: string, description?: string, origin: string }[]}
+ * @returns {{ name: string, params: string, returns?: string, description?: string, origin: string, entry: import('./project.js').Entry }[]}
  */
 function methodsFor(variable, file, site) {
 	const [folder, ...rest] = path.relative(site, file).split(path.sep);
@@ -217,7 +218,7 @@ function methodsFor(variable, file, site) {
 	const kind = { page: 'pageMethods', this: 'pageMethods', site: 'siteMethods', block: 'blockMethods' }[variable];
 	const methods = [...entriesOf(site, kind)].map(([name, entry]) => {
 		const info = cached(`closure:${entry.file}:${entry.line}`, () => closureInfo(entry));
-		return { name, params: info?.params ?? '', returns: info?.returns, description: info?.description, origin: origin(entry, site) };
+		return { name, params: info?.params ?? '', returns: info?.returns, description: info?.description, origin: origin(entry, site), entry };
 	});
 
 	const template = rest.join('/').replace(/\..*$/, '');
@@ -225,7 +226,7 @@ function methodsFor(variable, file, site) {
 
 	if (model !== undefined) {
 		const file = path.relative(path.dirname(site), model.file);
-		methods.push(...cached(`model:${model.file}`, () => classMethods(model.file, model.className)).map((method) => ({ ...method, origin: `model · ${file}` })));
+		methods.push(...cached(`model:${model.file}`, () => classMethods(model.file, model.className)).map((method) => ({ ...method, origin: `model · ${file}`, entry: { file: model.file, line: method.line, source: /** @type {const} */ ('site') } })));
 	}
 
 	return methods;
@@ -816,12 +817,17 @@ function origin(entry, site) {
 
 /**
  * Markdown for a snippet or collection: its origin and what it expects or returns
- * @param {import('./calls.js').Kind | 'blueprint' | 'variable' | 'field'} kind
+ * @param {import('./calls.js').Kind | 'blueprint' | 'variable' | 'field' | 'member'} kind
  * @param {string} name
- * @param {import('./project.js').Entry & { value?: string }} entry
+ * @param {import('./project.js').Entry & { value?: string, markdown?: string }} entry
  * @param {string} site
  */
 function describe(kind, name, entry, site) {
+	// Methods and fields after `->` come with their own description
+	if (kind === 'member') {
+		return entry.markdown;
+	}
+
 	// The entry of a controller variable carries its value
 	if (kind === 'variable') {
 		return `**$${name}** · ${origin(entry, site)}\n\n\`\`\`php\n'${name}' => ${entry.value}\n\`\`\``;
@@ -856,6 +862,112 @@ function describe(kind, name, entry, site) {
 }
 
 /**
+ * Where a field of a blueprint is defined: in the blueprint itself, or in one it extends
+ * (a tab, a field partial …), followed through the blueprints they extend in turn
+ * @param {string} name the blueprint, e.g. `pages/project`
+ * @param {string} field
+ * @param {string} site
+ * @param {Set<string>} [seen]
+ * @returns {import('./project.js').Entry | null}
+ */
+function fieldLocation(name, field, site, seen = new Set()) {
+	const entry = entriesOf(site, 'blueprint').get(name);
+
+	if (entry === undefined || entry.inline === true || seen.has(name) === true) {
+		return null;
+	}
+
+	seen.add(name);
+
+	let text;
+
+	try {
+		text = fs.readFileSync(entry.file, 'utf8');
+	} catch {
+		return null;
+	}
+
+	const offset = fieldKeyOffset(text, field);
+
+	if (offset !== -1) {
+		return { file: entry.file, line: text.slice(0, offset).split('\n').length - 1, source: entry.source, plugin: entry.plugin };
+	}
+
+	for (const reference of blueprintReferences(text)) {
+		const found = fieldLocation(reference.name, field, site, seen);
+
+		if (found !== null) {
+			return found;
+		}
+	}
+
+	return null;
+}
+
+/**
+ * Markdown for a method: its signature, description and origin
+ * @param {{ name: string, params: string, returns?: string, description?: string, origin?: string }} method
+ */
+function describeMethod(method) {
+	const signature = `${method.name}(${method.params})${method.returns === undefined ? '' : ': ' + method.returns}`;
+	return ['```php', signature, '```', method.description, method.origin].filter((line) => line !== undefined).join('\n');
+}
+
+/**
+ * What `$page->name(` (or `$site`, `$block`, `$this`) or `$page->field()->name(` refers to:
+ * a method of a plugin, the config or the page's model (methods win, as in PHP),
+ * a field of the blueprint, or a field method (a plugin's, or Kirby's own in its source)
+ * @param {TextDocument} document
+ * @param {NonNullable<ReturnType<typeof memberAt>>} member
+ * @param {string} site
+ * @returns {(import('./project.js').Entry & { markdown: string }) | undefined}
+ */
+function memberEntry(document, member, site) {
+	const file = fileURLToPath(document.uri);
+	const same = (name) => name.toLowerCase() === member.name.toLowerCase();
+
+	if (member.field !== undefined) {
+		const field = [...fieldsFor(member.variable, file, site).values()].find(({ name }) => name.toLowerCase() === member.field.toLowerCase());
+		const custom = field === undefined ? undefined : [...entriesOf(site, 'fieldMethods')].find(([name]) => same(name));
+
+		if (custom !== undefined) {
+			const info = cached(`closure:${custom[1].file}:${custom[1].line}`, () => closureInfo(custom[1]));
+			const params = (info?.params ?? '').split(',').slice(1).join(',').trim();
+			return { ...custom[1], markdown: describeMethod({ name: custom[0], params, returns: info?.returns, description: info?.description, origin: origin(custom[1], site) }) };
+		}
+
+		// Kirby's own field methods, in Kirby's source if it's there
+		const core = field === undefined ? undefined : fieldMethods().find(({ name }) => same(name));
+		const source = path.join(path.dirname(site), 'kirby', 'src', 'Content', 'FieldMethods.php');
+		const line = core === undefined ? -1 : cached('field-methods-source:' + source, () => {
+			try {
+				return fs.readFileSync(source, 'utf8').split('\n');
+			} catch {
+				return [];
+			}
+		}).findIndex((row) => row.includes(`public function ${core.name}(`));
+
+		return line === -1 ? undefined : { file: source, line, source: 'kirby', markdown: describeMethod({ ...core, origin: 'Kirby core' }) };
+	}
+
+	const method = methodsFor(member.variable, file, site).find(({ name }) => same(name));
+
+	if (method !== undefined) {
+		return { ...method.entry, markdown: describeMethod(method) };
+	}
+
+	const field = [...fieldsFor(member.variable, file, site).values()].find(({ name }) => same(name));
+	const location = field === undefined ? null : field.blueprints.map((name) => fieldLocation(name, field.name, site)).find((found) => found !== null) ?? null;
+
+	if (location === null) {
+		return undefined;
+	}
+
+	const markdown = [`**${field.name}** · ${field.type} · ${field.blueprints.join(', ')}`, field.label, origin(location, site)].filter((line) => line !== undefined).join('\n\n');
+	return { ...location, markdown };
+}
+
+/**
  * The site and the name at a position, with what it refers to
  * @param {{ uri: string }} textDocument
  * @param {{ line: number, character: number }} position
@@ -887,8 +999,16 @@ function lookup(textDocument, position) {
 	} else if (name !== null) {
 		entry = name.kind === 'asset' ? assetEntry(site, name.name) : entriesOf(site, name.kind).get(name.name);
 	} else if (site !== null) {
+		// A method or field: $page->name(), $page->field()->name()
+		const member = memberAt(document.getText(), offset);
+		entry = member === null ? undefined : memberEntry(document, member, site);
+
+		if (entry !== undefined) {
+			name = { kind: 'member', ...member };
+		}
+
 		// A variable in a template that its controller returns
-		const variable = variableAt(document.getText(), offset);
+		const variable = entry === undefined ? variableAt(document.getText(), offset) : null;
 		const found = variable === null ? undefined : templateVariables(fileURLToPath(document.uri), site)?.variables.get(variable.name);
 
 		if (found !== undefined) {

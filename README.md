@@ -33,7 +33,7 @@ For all of them:
 	- `intro: textarea` is flagged: Kirby reads it as `extends`, not as the type. If a plugin registers blueprints in a way that can't be read, missing blueprints and templates are only a hint.
 	- A field reference in `fields: [intro]` must be defined at the top (checked in the blueprints of pages, files, users and the site; a partial gets them from the blueprint that uses it). A block type in `fieldsets` needs a `blocks/*` blueprint.
 	- A variable in a template must come from the template itself, its controllers or Kirby. This is only checked when every controller could be read completely (not with `return $data;` or `...$spread`) and the template doesn't use `extract()`, `$$name` or `include`.
-- **Jump to Definition** to the file (or the line of a collection defined as a closure, or of a translation key)
+- **Jump to Definition** to the file (or the line of a collection defined as a closure, or of a translation key). After `->` to the method (the closure in a plugin or the config, the method in the model, Kirby's own field method in its source) or to the field's key in the blueprint, also when it's defined in a tab or partial the blueprint extends
 - **Hover** with the same information as the completion
 - **Code lenses** with each snippet's or collection's origin above its line (not shown in Nova)
 

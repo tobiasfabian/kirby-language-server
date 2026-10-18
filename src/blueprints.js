@@ -807,3 +807,27 @@ export function listItemContext(text, offset) {
 
 	return list === null ? null : { list, prefix: match[3], start: offset - match[3].length };
 }
+
+/**
+ * Where a blueprint defines a field: the offset of its key in a map of `fields`
+ * (names compared without case, as Kirby does). -1 if it isn't defined there.
+ * @param {string} text
+ * @param {string} name
+ */
+export function fieldKeyOffset(text, name) {
+	const document = parseDocument(text, { uniqueKeys: false, logLevel: 'silent' });
+	let found = -1;
+
+	visit(document, {
+		Pair(_, pair, path) {
+			const parent = path.at(-2);
+
+			if (isScalar(pair.key) === true && String(pair.key.value).toLowerCase() === name.toLowerCase() && isPair(parent) === true && isScalar(parent.key) === true && parent.key.value === 'fields' && isContainerMap(path) === true) {
+				found = pair.key.range[0];
+				return visit.BREAK;
+			}
+		},
+	});
+
+	return found;
+}

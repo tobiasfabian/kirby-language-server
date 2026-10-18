@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { completionContext, fieldContext, fieldMethodContext, findCalls, nameAt, propsContext, variableAt, variableContext } from '../src/calls.js';
+import { completionContext, fieldContext, fieldMethodContext, findCalls, memberAt, nameAt, propsContext, variableAt, variableContext } from '../src/calls.js';
 
 const names = (text) => findCalls(text).map((call) => [call.kind, ...call.names.map(({ name }) => name)]);
 
@@ -144,4 +144,14 @@ test('detects field methods and variables', () => {
 	assert.equal(variableContext('<?= $page->', 11), null);
 	assert.equal(variableContext('<?= "\\$co', 9), null);
 	assert.deepEqual(variableAt('<?= $cover ?>', 6), { name: 'cover', start: 4, end: 10 });
+});
+
+test('finds the method or field under the cursor', () => {
+	const text = '<?= $page->cover()->toFile()->url() ?> <?= $site->logo() ?>';
+
+	assert.deepEqual(memberAt(text, text.indexOf('cover') + 2), { variable: 'page', name: 'cover', start: 11, end: 16 });
+	assert.deepEqual(memberAt(text, text.indexOf('toFile') + 2), { variable: 'page', field: 'cover', name: 'toFile', start: 20, end: 26 });
+	assert.equal(memberAt(text, text.indexOf('url') + 1), null);
+	assert.equal(memberAt(text, text.indexOf('logo'))?.variable, 'site');
+	assert.equal(memberAt(text, 1), null);
 });
