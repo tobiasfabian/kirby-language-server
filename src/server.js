@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
+	CodeActionKind,
 	CompletionItemKind,
 	CompletionItemTag,
 	createConnection,
@@ -14,8 +15,8 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldKeyOffset, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
 import { completionContext, fieldContext, fieldMethodContext, findCalls, memberAt, nameAt, propsContext, variableAt, variableContext } from './calls.js';
-import { classMethods, closureInfo, collectionSignature, controllerVariables, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listControllers, listDocroot, listMethods, listModels, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
-import { undefinedVariables } from './variables.js';
+import { classInfo, classMethods, closureInfo, collectionSignature, controllerVariables, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listControllers, listDocroot, listMethods, listModels, listSnippets, listStubs, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
+import { isInPhp, phpOnly, undefinedVariables } from './variables.js';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -233,6 +234,75 @@ function methodsFor(variable, file, site) {
 }
 
 /**
+ * The classes a file tells PHP's language server its variables have: `@var ProjectPage $page`,
+ * typed parameters (`function (ProjectPage $page)`), and `$this` in a class. Short names only.
+ * @param {string} text
+ * @returns {Map<string, string>}
+ */
+function typesIn(text) {
+	const types = new Map();
+	const short = (type) => type.replace(/<[\s\S]*$/, '').replace(/^\?/, '').split('|')[0].split('\\').pop();
+
+	for (const match of text.matchAll(/@var\s+([^\s$]+)\s+\$(\w+)/g)) {
+		types.set(match[2], short(match[1]));
+	}
+
+	for (const match of text.matchAll(/\b(?:function|fn)\s*\(([^)]*)\)/g)) {
+		for (const param of match[1].matchAll(/([\\\w?|]+)\s+&?\$(\w+)/g)) {
+			if (types.has(param[2]) === false) {
+				types.set(param[2], short(param[1]));
+			}
+		}
+	}
+
+	const declaration = text.match(/\bclass\s+(\w+)/);
+
+	if (declaration !== null) {
+		types.set('this', declaration[1]);
+	}
+
+	return types;
+}
+
+/**
+ * What PHP's language server knows `$page`, `$site`, `$block` or `$this` has, if the file tells it
+ * the variable's class (see `typesIn`): the methods and `@method` lines of that class if it's a
+ * model, and the `@method` lines of the stubs for Kirby's class (`Page`, `Site`, `Block`).
+ * `fields` are the `@method` lines that return a field. Null if PHP doesn't know the class; names in lowercase.
+ * @param {'page' | 'site' | 'block' | 'this'} variable
+ * @param {TextDocument} document
+ * @param {string} site
+ * @returns {{ names: Set<string>, fields: Set<string> } | null}
+ */
+function phpKnowledge(variable, document, site) {
+	const type = typesIn(document.getText()).get(variable);
+
+	if (type === undefined) {
+		return null;
+	}
+
+	const base = { page: 'Page', this: 'Page', site: 'Site', block: 'Block' }[variable];
+	const names = new Set(cached('stubs:' + site, () => listStubs(site), 10000).get(base) ?? []);
+	const fields = new Set();
+	const model = [...cached('models:' + site, () => listModels(site)).values()].find(({ className }) => className === type);
+	const info = model === undefined ? null : cached(`class:${model.file}`, () => classInfo(model.file, model.className));
+
+	for (const method of info?.methods ?? []) {
+		names.add(method.name.toLowerCase());
+	}
+
+	for (const method of info?.documented ?? []) {
+		names.add(method.name.toLowerCase());
+
+		if (/Field$/.test(method.returns) === true) {
+			fields.add(method.name.toLowerCase());
+		}
+	}
+
+	return { names, fields };
+}
+
+/**
  * A completion item for a method
  * @param {{ name: string, params: string, returns?: string, description?: string, origin?: string }} method
  * @param {{ start: import('vscode-languageserver').Position, end: import('vscode-languageserver').Position }} range
@@ -268,11 +338,16 @@ function fieldCompletion(document, position, site) {
 
 	const file = fileURLToPath(document.uri);
 	const range = { start: document.positionAt(context.start), end: document.positionAt(context.end) };
-	const methods = methodsFor(context.variable, file, site);
+	const all = methodsFor(context.variable, file, site);
+
+	// What PHP's language server knows from types and docblocks is left to it
+	const known = phpKnowledge(context.variable, document, site);
+	const unknown = ({ name }) => known === null || known.names.has(name.toLowerCase()) === false;
+	const methods = all.filter(unknown);
 
 	// A method of the same name wins over the field
-	const overridden = new Set(methods.map(({ name }) => name.toLowerCase()));
-	const fields = [...fieldsFor(context.variable, file, site).values()].filter(({ name }) => overridden.has(name.toLowerCase()) === false).map((field, index) => ({
+	const overridden = new Set(all.map(({ name }) => name.toLowerCase()));
+	const fields = [...fieldsFor(context.variable, file, site).values()].filter(({ name }) => overridden.has(name.toLowerCase()) === false).filter(unknown).map((field, index) => ({
 		label: field.name,
 		kind: CompletionItemKind.Field,
 		detail: `${field.type} · ${field.blueprints.join(', ')}`,
@@ -310,6 +385,12 @@ function fieldMethodCompletion(document, position, site) {
 		const params = (info?.params ?? '').split(',').slice(1).join(',').trim();
 		return methodItem({ name, params, returns: info?.returns, description: info?.description, origin: origin(entry, site) }, range, context.call, '1' + name);
 	});
+
+	// If PHP's language server knows the field (an `@method` line), it shows Kirby's field methods and those of stubs
+	if (phpKnowledge(context.variable, document, site)?.fields.has(field.name.toLowerCase()) === true) {
+		const stubbed = cached('stubs:' + site, () => listStubs(site), 10000).get('Field') ?? new Set();
+		return custom.filter(({ label }) => stubbed.has(label.toLowerCase()) === false);
+	}
 
 	const core = fieldMethods().map((method) => methodItem(method, range, context.call, fitting.includes(method.name) ? '0' + fitting.indexOf(method.name) : '2' + method.name));
 
@@ -354,6 +435,131 @@ function valueCompletion(document, position, site) {
 		sortText: '2' + index,
 		textEdit: { range, newText: value },
 	}));
+}
+
+/**
+ * Compares the `@method … Field name()` lines of a model in `site/models` with the fields of
+ * its blueprint, for models that document their fields this way (at least one such line):
+ * the fields without a line, and the lines for fields the blueprint doesn't have.
+ * PHP's language server only knows the documented ones.
+ * @param {TextDocument} document
+ * @param {string} site
+ */
+function modelDocs(document, site) {
+	const file = fileURLToPath(document.uri);
+	const [folder, name, ...rest] = path.relative(site, file).split(path.sep);
+	const template = name?.endsWith('.php') ? name.slice(0, -4) : null;
+
+	if (folder !== 'models' || rest.length > 0 || template === null || entriesOf(site, 'blueprint').has('pages/' + template) === false) {
+		return null;
+	}
+
+	const info = classInfo(file, undefined, document.getText());
+	const documented = info?.documented.filter(({ returns }) => /Field$/.test(returns)) ?? [];
+
+	if (documented.length === 0) {
+		return null;
+	}
+
+	const fields = [...fieldsFor('page', file, site).values()];
+	const has = (list, name) => list.some((item) => item.name.toLowerCase() === name.toLowerCase());
+
+	// Every page has a title, with or without a field in the blueprint, and Kirby's Page::title()
+	const isTitle = ({ name }) => name.toLowerCase() === 'title';
+
+	return {
+		info,
+		blueprint: 'pages/' + template,
+		// A method of the model takes the field's place
+		missing: fields.filter((field) => has(info.documented, field.name) === false && has(info.methods, field.name) === false && isTitle(field) === false),
+		stale: documented.filter((method) => has(fields, method.name) === false && has(info.methods, method.name) === false && isTitle(method) === false),
+		type: documented[0].returns,
+	};
+}
+
+/**
+ * Hints for the `@method` lines of a model: fields of the blueprint without one (on the class),
+ * and lines for fields that don't exist (on the line). Both come with a quick fix.
+ * @param {TextDocument} document
+ * @param {string} site
+ */
+function modelDiagnostics(document, site) {
+	const docs = modelDocs(document, site);
+
+	if (docs === null) {
+		return [];
+	}
+
+	const lineRange = (line) => ({ start: { line, character: 0 }, end: { line, character: document.getText({ start: { line, character: 0 }, end: { line: line + 1, character: 0 } }).replace(/\n$/, '').length } });
+	const diagnostics = docs.stale.map((method) => ({
+		severity: DiagnosticSeverity.Warning,
+		range: lineRange(method.line),
+		message: `${docs.blueprint} has no field “${method.name}”, so PHP’s language server offers a field that doesn’t exist.`,
+		source: 'Kirby',
+		code: 'stale-method-doc',
+	}));
+
+	if (docs.missing.length > 0) {
+		const names = docs.missing.map(({ name }) => name).join(', ');
+
+		diagnostics.push({
+			severity: DiagnosticSeverity.Information,
+			range: lineRange(docs.info.line),
+			message: `${docs.info.name} documents fields with @method, but not these of ${docs.blueprint}: ${names}. PHP’s language server doesn’t know them.`,
+			source: 'Kirby',
+			code: 'missing-method-docs',
+		});
+	}
+
+	return diagnostics;
+}
+
+/**
+ * Quick fixes for the hints of `modelDiagnostics`: add the missing `@method` lines (after the
+ * last one, written like it), or remove a line for a field that doesn't exist
+ * @param {TextDocument} document
+ * @param {string} site
+ * @param {{ start: { line: number }, end: { line: number } }} range
+ * @param {any[]} diagnostics those the editor sends along
+ */
+function modelCodeActions(document, site, range, diagnostics) {
+	const docs = modelDocs(document, site);
+
+	if (docs === null) {
+		return [];
+	}
+
+	const uri = document.uri;
+	const lines = document.getText().split('\n');
+	const touches = (line) => line >= range.start.line && line <= range.end.line;
+	const matching = (code, line) => diagnostics.filter((diagnostic) => diagnostic.code === code && diagnostic.range.start.line === line);
+	const actions = [];
+
+	if (docs.missing.length > 0 && touches(docs.info.line) === true) {
+		// After the last @method line, with its indentation
+		const last = docs.info.documented.at(-1).line;
+		const prefix = lines[last].match(/^\s*\*\s*/)?.[0] ?? ' * ';
+		const text = docs.missing.map(({ name }) => `${prefix}@method ${docs.type} ${name}()\n`).join('');
+
+		actions.push({
+			title: docs.missing.length === 1 ? `Add @method line for “${docs.missing[0].name}”` : `Add @method lines for ${docs.missing.length} fields`,
+			kind: CodeActionKind.QuickFix,
+			isPreferred: true,
+			diagnostics: matching('missing-method-docs', docs.info.line),
+			edit: { changes: { [uri]: [{ range: { start: { line: last + 1, character: 0 }, end: { line: last + 1, character: 0 } }, newText: text }] } },
+		});
+	}
+
+	for (const method of docs.stale.filter(({ line }) => touches(line))) {
+		actions.push({
+			title: `Remove @method line for “${method.name}”`,
+			kind: CodeActionKind.QuickFix,
+			diagnostics: matching('stale-method-doc', method.line),
+			edit: { changes: { [uri]: [{ range: { start: { line: method.line, character: 0 }, end: { line: method.line + 1, character: 0 } }, newText: '' }] } },
+		});
+	}
+
+	return actions;
 }
 
 // What Kirby gives every template
@@ -977,8 +1183,8 @@ function memberEntry(document, member, site) {
  */
 function lookup(textDocument, position) {
 	const document = documents.get(textDocument.uri);
-	const site = document ? siteFor(document.uri) : null;
 	const offset = document?.offsetAt(position);
+	const site = document !== undefined && isCode(document, offset) === true ? siteFor(document.uri) : null;
 	const blueprint = site !== null && isBlueprint(document) === true;
 	const covers = ({ start, end }) => offset >= start && offset <= end;
 	const fieldset = blueprint ? fieldsetReferences(document.getText()).find(covers) ?? null : null;
@@ -1029,6 +1235,25 @@ function lookup(textDocument, position) {
  */
 function isBlueprint(document) {
 	return /\.ya?ml$/.test(document.uri);
+}
+
+/**
+ * Whether a position is somewhere the server has something to say: in a blueprint
+ * anywhere, in a PHP file only in its PHP code, not in its HTML
+ * @param {TextDocument} document
+ * @param {number} offset
+ */
+function isCode(document, offset) {
+	return isBlueprint(document) === true || isInPhp(document.getText(), offset) === true;
+}
+
+/**
+ * The text to look for calls in: a blueprint as it is, of a PHP file only its PHP code
+ * (the HTML around it blanked out, so offsets stay the same)
+ * @param {TextDocument} document
+ */
+function codeOf(document) {
+	return isBlueprint(document) === true ? document.getText() : phpOnly(document.getText());
 }
 
 /**
@@ -1100,7 +1325,7 @@ function validate(document) {
 
 	const diagnostics = [];
 
-	for (const call of findCalls(document.getText())) {
+	for (const call of findCalls(codeOf(document))) {
 		let severity = DiagnosticSeverity.Warning;
 
 		// Every template of a list must exist
@@ -1155,7 +1380,7 @@ function validate(document) {
 		});
 	}
 
-	diagnostics.push(...variableDiagnostics(document, site));
+	diagnostics.push(...variableDiagnostics(document, site), ...modelDiagnostics(document, site));
 
 	if (isBlueprint(document) === true) {
 		diagnostics.push(...blueprintDiagnostics(document, site), ...referenceDiagnostics(document, site));
@@ -1197,6 +1422,7 @@ connection.onInitialize((params) => {
 			definitionProvider: true,
 			hoverProvider: true,
 			codeLensProvider: { resolveProvider: false },
+			codeActionProvider: { codeActionKinds: [CodeActionKind.QuickFix] },
 		},
 	};
 });
@@ -1207,7 +1433,9 @@ connection.onInitialized(() => {
 
 connection.onCompletion(({ textDocument, position }) => {
 	const document = documents.get(textDocument.uri);
-	const site = document ? siteFor(document.uri) : null;
+
+	// Nothing to offer in the HTML of a template
+	const site = document !== undefined && isCode(document, document.offsetAt(position)) === true ? siteFor(document.uri) : null;
 
 	if (site !== null && isBlueprint(document) === true) {
 		// `create:` of a pagelist takes templates or false
@@ -1321,6 +1549,13 @@ connection.onHover(({ textDocument, position }) => {
 });
 
 // The origin of each call above its line (editors that don't ask for hovers still show these)
+connection.onCodeAction(({ textDocument, range, context }) => {
+	const document = documents.get(textDocument.uri);
+	const site = document ? siteFor(document.uri) : null;
+
+	return site === null ? [] : modelCodeActions(document, site, range, context.diagnostics);
+});
+
 connection.onCodeLens(({ textDocument }) => {
 	const document = documents.get(textDocument.uri);
 	const site = document ? siteFor(document.uri) : null;
@@ -1329,7 +1564,7 @@ connection.onCodeLens(({ textDocument }) => {
 		return [];
 	}
 
-	return findCalls(document.getText()).filter((call) => call.kind === 'snippet' || call.kind === 'collection').flatMap((call) => {
+	return findCalls(codeOf(document)).filter((call) => call.kind === 'snippet' || call.kind === 'collection').flatMap((call) => {
 		const entries = entriesOf(site, call.kind);
 		const found = call.names.map(({ name }) => entries.get(name)).find((entry) => entry !== undefined);
 

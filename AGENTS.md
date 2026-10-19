@@ -22,6 +22,8 @@ A language server for Kirby CMS projects (`src/`) and the extensions that start 
 - No false warnings: a warning is only shown for literal names. Names built at runtime are skipped. Registered snippets and collections are read with the small parser in `src/php.js`, which knows the nesting: `'collections'` inside `'api' => [...]` are API collections, not Kirby collections.
 - Translation keys are only reported as missing with a Warning when every source could be read; if a plugin builds its translations at runtime (JSON, YAML), it's an Information instead. Kirby's own keys come from `kirby/i18n/translations/*.json` (the file per site language; es → es_ES.json if there is no es.json) and are offered after the project's keys.
 - Before changing what counts as a call, run the server against a few real projects and check that the warnings it shows are real.
+- In PHP files only the PHP code counts (`phpRegions()` in `src/variables.js`); the HTML around it is neither completed nor checked.
+- PHP's language server (Intelephense) comes first: completions don't repeat what it knows from types (`@var`, typed parameters, `$this`), `@method` docblocks and `*.stub.php` files (`phpKnowledge()` in `src/server.js`). Offer only what it can't know.
 
 ## VS Code
 

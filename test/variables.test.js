@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { phpCode, undefinedVariables } from '../src/variables.js';
+import { isInPhp, phpCode, phpOnly, phpRegions, undefinedVariables } from '../src/variables.js';
 
 const names = (text) => undefinedVariables(text)?.map(({ name }) => name) ?? null;
 
@@ -25,4 +25,15 @@ test('gives up where variables can’t be known', () => {
 	assert.equal(names('<?php extract($data) ?><?= $a ?>'), null);
 	assert.equal(names('<?php $$name = 1 ?>'), null);
 	assert.equal(names('<?php include "x.php" ?>'), null);
+});
+
+test('finds the PHP parts of a file', () => {
+	const text = '<p>a</p><?php $a = \'?>\'; /* ?> */ // ?>\n<b>c</b><?= $b ?><?xml version="1.0" ?>';
+
+	assert.deepEqual(phpRegions(text).map(({ start, end }) => text.slice(start, end)), [" $a = '?>'; /* ?> */ // ", ' $b ']);
+	assert.equal(isInPhp(text, text.indexOf('$a')), true);
+	assert.equal(isInPhp(text, text.indexOf('<b>')), false);
+	assert.equal(isInPhp(text, text.indexOf('version')), false);
+	assert.equal(isInPhp('<?php\nreturn [];', 12), true);
+	assert.equal(phpOnly('<p>t(\'x\')</p><?= t(\'y\') ?>'), ' '.repeat(17) + "t('y')   ");
 });

@@ -27,6 +27,9 @@ In blueprints (`src/blueprints.js`):
 
 For all of them:
 
+- **Only in PHP code**: in a PHP file, the server only completes, describes and checks its PHP code (between `<?php`/`<?=` and `?>`), not the HTML, CSS or JavaScript around it.
+- **PHP's language server first**: where a file tells PHP the class of `$page`, `$site`, `$block` or `$this` (`/** @var ProjectPage $page */`, a typed parameter like `function (ProjectPage $page)`, the class of a model), the server leaves out what PHP already knows from it: fields documented with `@method`, the model's own methods, methods documented in `*.stub.php` files, and after a documented field Kirby's field methods. What's left is what PHP doesn't know, e.g. fields missing in the docblock.
+- **`@method` lines of models**: in a model that documents fields with `@method`, a hint lists the blueprint's fields without a line, and a warning marks lines for fields the blueprint doesn't have. Each comes with a quick fix that adds or removes the lines.
 - **Warnings** for names that don't exist:
 	- `t('key', 'Fallback')` isn't flagged, and Kirby's own keys (`t('save')`) are known. If a plugin loads translations at runtime, missing keys are only a hint.
 	- A page template exists if there's a blueprint, a template file (also from a plugin) or a page in the content folder that uses it. A file template without a blueprint is only a hint: Kirby falls back to `files/default`.

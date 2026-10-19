@@ -13,3 +13,5 @@
 - Completion of file paths in `hashedUrl('…')`, `asset('…')`, `svg('…')`, `css('…')`, `js('…')` and `url('assets/…')`
 - Command Open Referenced File (⌃⌥⌘O), also for methods, fields and field methods after `->`
 - Warnings for snippets, collections, translation keys, files, blueprints and templates that don't exist
+- Only the PHP code of a file is completed and checked, not its HTML
+- What PHP's language server knows from `@var`, `@method` and stub files is left to it; hints and quick fixes for the `@method` lines of models
