@@ -10,6 +10,8 @@ tabs:
       intro: textarea
       text:
         type: textarea
+      year:
+        type: number
   seo: tabs/seo
   more:
     extends:

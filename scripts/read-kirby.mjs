@@ -235,3 +235,158 @@ for (const match of trait.matchAll(/(?:\/\*\*((?:(?!\*\/)[\s\S])*)\*\/\s*)?publi
 
 write('field-methods.json', { kirby: version, methods });
 console.log(`Wrote ${methods.length} field methods of Kirby ${version} to src/field-methods.json`);
+
+// Query classes: the public methods of the classes a query walks through, with what they return
+const QUERY_CLASSES = {
+	App: 'Kirby\\Cms\\App',
+	Site: 'Kirby\\Cms\\Site',
+	Page: 'Kirby\\Cms\\Page',
+	Pages: 'Kirby\\Cms\\Pages',
+	File: 'Kirby\\Cms\\File',
+	Files: 'Kirby\\Cms\\Files',
+	User: 'Kirby\\Cms\\User',
+	Users: 'Kirby\\Cms\\Users',
+	Field: 'Kirby\\Content\\Field',
+	Structure: 'Kirby\\Cms\\Structure',
+	StructureObject: 'Kirby\\Cms\\StructureObject',
+	Blocks: 'Kirby\\Cms\\Blocks',
+	Block: 'Kirby\\Cms\\Block',
+	Layouts: 'Kirby\\Cms\\Layouts',
+	Layout: 'Kirby\\Cms\\Layout',
+};
+
+// What the entries of a collection are (its TValue)
+const ITEMS = { Pages: 'Page', Files: 'File', Users: 'User', Structure: 'StructureObject', Blocks: 'Block', Layouts: 'Layout' };
+
+// Classes that pass unknown methods on with __call: a file to its image (`file.dimensions`)
+const PROXIES = { File: 'Kirby\\Image\\Image' };
+
+/**
+ * Reads a PHP class or trait by its full name: its parent, traits and public methods
+ * @param {string} fqn
+ */
+function parseClass(fqn) {
+	const file = path.join(src, fqn.replace(/^Kirby\\/, '').split('\\').join('/') + '.php');
+
+	if (fs.existsSync(file) === false) {
+		return null;
+	}
+
+	const code = read(file);
+	const namespace = code.match(/^namespace\s+([\w\\]+);/m)?.[1] ?? '';
+	const imports = Object.fromEntries([...code.matchAll(/^use\s+([\w\\]+)(?:\s+as\s+(\w+))?;/gm)].map(([, name, alias]) => [alias ?? name.split('\\').pop(), name]));
+	const resolve = (name) => name.startsWith('\\') ? name.slice(1) : imports[name.split('\\')[0]] !== undefined ? [imports[name.split('\\')[0]], ...name.split('\\').slice(1)].join('\\') : namespace + '\\' + name;
+	const declaration = code.match(/^(?:abstract |final |readonly )*(?:class|trait)\s+\w+(?:\s+extends\s+([\w\\]+))?/m);
+	const methods = [];
+
+	for (const match of code.matchAll(/(?:\/\*\*((?:(?!\*\/)[\s\S])*)\*\/\s*)?(?:#\[[^\]]*\]\s*)*public\s+(static\s+)?function\s+(\w+)\s*\(/g)) {
+		if (match[2] !== undefined || match[3].startsWith('__')) {
+			continue;
+		}
+
+		const open = match.index + match[0].length - 1;
+		let close = open;
+
+		for (let i = open, depth = 0, quote = null; i < code.length; i++) {
+			const char = code[i];
+
+			if (quote !== null) {
+				quote = char === '\\' ? (i++, quote) : char === quote ? null : quote;
+			} else if (char === '\'' || char === '"') {
+				quote = char;
+			} else if (char === '(') {
+				depth++;
+			} else if (char === ')' && --depth === 0) {
+				close = i;
+				break;
+			}
+		}
+
+		methods.push({
+			name: match[3],
+			params: splitTopLevel(code.slice(open + 1, close)).join(', '),
+			native: code.slice(close + 1).match(/^\s*:\s*([\w\\|?]+)/)?.[1],
+			doc: match[1]?.match(/@return\s+(\S+)/)?.[1],
+			description: match[1] === undefined ? '' : description(match[1]),
+			file: path.relative(kirby, file).split(path.sep).join('/'),
+			resolve,
+		});
+	}
+
+	return {
+		parent: declaration?.[1] === undefined ? null : resolve(declaration[1]),
+		traits: [...code.matchAll(/^\tuse\s+([\w\\, ]+);/gm)].flatMap(([, list]) => list.split(',').map((name) => resolve(name.trim()))),
+		methods,
+	};
+}
+
+/**
+ * The public methods of a query class, its own first, then those of its traits and parents
+ * @param {string} key e.g. `Pages`
+ */
+function queryMethods(key) {
+	const methods = new Map();
+	const byFqn = Object.fromEntries(Object.entries(QUERY_CLASSES).map(([name, fqn]) => [fqn, name]));
+
+	// The type a method returns, as a query class if it is one
+	const typeOf = (method) => {
+		const types = (method.doc ?? method.native ?? '').split('|').map((type) => type.replace(/^\?/, '').replace(/<.*$/, '')).filter((type) => type !== '' && type !== 'null' && type !== 'false');
+		const type = types[0];
+
+		if (type === undefined) {
+			return null;
+		}
+
+		if (['static', 'self', '$this'].includes(type) === true) {
+			return key;
+		}
+
+		if (type === 'TValue') {
+			return ITEMS[key] ?? null;
+		}
+
+		return /^[A-Z\\]/.test(type) ? byFqn[method.resolve(type)] ?? null : null;
+	};
+
+	const walk = (fqn, seen = new Set()) => {
+		const parsed = seen.has(fqn) ? null : parseClass(fqn);
+
+		if (parsed === null) {
+			return;
+		}
+
+		seen.add(fqn);
+
+		for (const method of parsed.methods) {
+			if (methods.has(method.name) === false) {
+				const returns = method.doc ?? method.native;
+				methods.set(method.name, {
+					name: method.name,
+					params: method.params,
+					...(returns === undefined ? {} : { returns }),
+					type: typeOf(method),
+					...(method.description === '' ? {} : { description: method.description }),
+					file: method.file,
+				});
+			}
+		}
+
+		parsed.traits.forEach((trait) => walk(trait, seen));
+
+		if (parsed.parent !== null) {
+			walk(parsed.parent, seen);
+		}
+	};
+
+	walk(QUERY_CLASSES[key]);
+
+	if (PROXIES[key] !== undefined) {
+		walk(PROXIES[key]);
+	}
+
+	return [...methods.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const classes = Object.fromEntries(Object.keys(QUERY_CLASSES).map((key) => [key, queryMethods(key)]));
+write('query-classes.json', { kirby: version, items: ITEMS, classes });
+console.log(`Wrote ${Object.keys(classes).length} query classes of Kirby ${version} to src/query-classes.json`);

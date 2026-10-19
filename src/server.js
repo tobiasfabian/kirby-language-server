@@ -15,9 +15,10 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldKeyAt, fieldKeyOffset, fieldTypeAt, optionValues, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
+import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldKeyAt, fieldKeyOffset, fieldTypeAt, optionValues, templatePlace, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
 import { completionContext, fieldContext, fieldMethodContext, findCalls, memberAt, nameAt, propsContext, variableAt, variableContext } from './calls.js';
 import { classInfo, classMethods, closureInfo, collectionSignature, controllerVariables, findAsset, findSites, listBlueprints, listCollections, listControllers, listDocroot, listMethods, listModels, listSnippets, listStubs, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
+import { chainAt, classOf, hasFields, queryContext, queryMethods, queryNameAt } from './query.js';
 import { isInPhp, phpOnly, undefinedVariables } from './variables.js';
 
 const connection = createConnection(ProposedFeatures.all);
@@ -191,13 +192,26 @@ function blueprintsForVariable(variable, file, site) {
  * @returns {Map<string, import('./blueprints.js').BlueprintField & { blueprints: string[] }>}
  */
 function fieldsFor(variable, file, site) {
+	return fieldsOf(blueprintsForVariable(variable, file, site), site);
+}
+
+/**
+ * The fields of blueprints that store content, by name, with the blueprints they're from.
+ * The site always has its title (in `site.txt`), which no blueprint defines.
+ * @param {string[]} names e.g. `pages/project`
+ * @param {string} site
+ * @returns {Map<string, import('./blueprints.js').BlueprintField & { blueprints: string[] }>}
+ */
+function fieldsOf(names, site) {
 	const find = blueprintFinder(site);
 	const fields = new Map();
 
-	for (const name of blueprintsForVariable(variable, file, site)) {
+	for (const name of names) {
 		const blueprint = find(name);
+		const own = blueprint === null ? [] : cached(`fields:${site}:${name}`, () => blueprintFields(blueprint, find));
+		const builtIn = name === 'site' && own.some((field) => field.name.toLowerCase() === 'title') === false ? [{ name: 'title', type: 'text', label: 'The title of the site' }] : [];
 
-		for (const field of blueprint === null ? [] : cached(`fields:${site}:${name}`, () => blueprintFields(blueprint, find))) {
+		for (const field of [...builtIn, ...own]) {
 			const known = fields.get(field.name);
 			fields.set(field.name, { ...field, blueprints: [...known?.blueprints ?? [], name] });
 		}
@@ -747,6 +761,276 @@ function varDocCodeActions(document, site, range, diagnostics) {
 		diagnostics: diagnostics.filter((diagnostic) => diagnostic.code === 'missing-var-doc'),
 		edit: { changes: { [document.uri]: [edit] } },
 	}];
+}
+
+// The start of a query: what each name is, by the blueprint the query is in (see `queryRoots`)
+const QUERY_ROOTS = {
+	kirby: 'The Kirby instance',
+	site: 'The site',
+	model: 'The page, file, user or site of the blueprint',
+	page: 'The page of the blueprint, or in a template the page of each entry',
+	file: 'The file of the blueprint, or in a template the file of each entry',
+	user: 'The user of the blueprint, or in a template the user of each entry',
+	users: 'All users',
+	collection: 'A collection: collection("name")',
+	item: 'In a template, each entry of the query',
+	block: 'In a template, each block of the query',
+	t: 'A translation: t("key")',
+};
+
+// Fields whose templates (`info`, `text` …) show each of their entries
+const ENTRY_FIELDS = ['pagelist', 'filelist', 'pagepicker', 'filepicker', 'userpicker'];
+
+/**
+ * What the names at the start of a query are: mostly the model of the blueprint (`page` with
+ * the fields and model of `pages/project`). In a template (`{{ … }}`) below `options:` or of a
+ * list or picker field, they're each entry, whose blueprint isn't known, so they have the fields
+ * of all blueprints of their kind.
+ * @param {TextDocument} document
+ * @param {string} site
+ * @param {boolean} template
+ * @param {number} offset
+ * @returns {Record<string, import('./query.js').QueryType>}
+ */
+function queryRoots(document, site, template, offset) {
+	const own = ownName(document, site);
+	const place = template ? templatePlace(document.getText(), offset) : null;
+	const type = place?.field === null || place === null ? null : typeOfField(place.field, site);
+	const entries = place !== null && (place.inOptions || ENTRY_FIELDS.includes(fieldTypes().find(({ name }) => name === type)?.replacement ?? type));
+	const all = (folder) => [...entriesOf(site, 'blueprint').keys()].filter((name) => name.startsWith(folder + '/') && name.slice(folder.length + 1).includes('/') === false);
+	const of = (folder, cls) => ({ cls, blueprints: entries === false && own?.startsWith(folder + '/') ? [own] : all(folder) });
+	const kinds = { pages: 'Page', files: 'File', users: 'User' };
+	const model = own === 'site' ? { cls: 'Site', blueprints: ['site'] } : kinds[own?.split('/')[0]] ? { cls: kinds[own.split('/')[0]], blueprints: [own] } : null;
+
+	return {
+		kirby: { cls: 'App' },
+		site: { cls: 'Site', blueprints: ['site'] },
+		...(model === null ? {} : { model }),
+		page: of('pages', 'Page'),
+		file: of('files', 'File'),
+		user: of('users', 'User'),
+		users: { cls: 'Users' },
+		...(template === true ? { block: { cls: 'Block', blueprints: all('blocks') } } : {}),
+	};
+}
+
+/**
+ * The methods a query class has besides Kirby's own: those of plugins and the config
+ * (`pageMethods` …) and, for a page of one blueprint, those of its model
+ * @param {import('./query.js').QueryType} type
+ * @param {string} site
+ * @returns {{ name: string, params: string, returns?: string, description?: string, origin: string }[]}
+ */
+function queryExtras(type, site) {
+	const kind = { Page: 'pageMethods', Site: 'siteMethods', Field: 'fieldMethods', Block: 'blockMethods' }[type.cls];
+	const methods = kind === undefined ? [] : [...entriesOf(site, kind)].map(([name, entry]) => {
+		const info = cached(`closure:${entry.file}:${entry.line}`, () => closureInfo(entry));
+
+		// Field methods get the field as their first parameter
+		const params = kind === 'fieldMethods' ? (info?.params ?? '').split(',').slice(1).join(',').trim() : info?.params ?? '';
+		return { name, params, returns: info?.returns, description: info?.description, origin: origin(entry, site), entry };
+	});
+
+	const model = type.cls === 'Page' && type.blueprints?.length === 1 ? cached('models:' + site, () => listModels(site)).get(type.blueprints[0].slice('pages/'.length)) : undefined;
+
+	if (model !== undefined) {
+		const file = path.relative(path.dirname(site), model.file);
+		const info = cached(`class:${model.file}`, () => classInfo(model.file, model.className));
+		const entry = (line) => ({ file: model.file, line, source: /** @type {const} */ ('site') });
+
+		methods.push(...(info?.methods ?? []).map((method) => ({ ...method, origin: `model · ${file}`, entry: entry(method.line) })));
+
+		// Methods only documented with @method (parent() returning the parent's model); fields are listed from the blueprint
+		for (const method of info?.documented ?? []) {
+			if (/Field$/.test(method.returns) === false && methods.some(({ name }) => name.toLowerCase() === method.name.toLowerCase()) === false) {
+				methods.push({ ...method, origin: `@method · ${file}`, entry: entry(method.line) });
+			}
+		}
+	}
+
+	return methods;
+}
+
+/**
+ * The query type a PHP type is: a query class (`Pages`), or the class of a page model
+ * (`ProjectsPage`), which is a page with the fields of its blueprint
+ * @param {string | undefined} returns
+ * @param {string} site
+ * @returns {import('./query.js').QueryType | null}
+ */
+function typeOfReturns(returns, site) {
+	if (classOf(returns) !== null) {
+		return { cls: classOf(returns) };
+	}
+
+	const name = (returns ?? '').split('|').map((part) => part.replace(/^\?/, '').split('\\').pop()).find((part) => part !== '' && part !== 'null');
+	const template = [...cached('models:' + site, () => listModels(site))].find(([, model]) => model.className === name)?.[0];
+
+	return template === undefined ? null : { cls: 'Page', blueprints: entriesOf(site, 'blueprint').has('pages/' + template) ? ['pages/' + template] : null };
+}
+
+/**
+ * The type a query chain leads to: its first name is one of the roots (or a function like `page("id")`)
+ * @param {{ names: string[], args: (string | null)[] }} chain
+ * @param {Record<string, import('./query.js').QueryType>} roots
+ * @param {string} site
+ * @returns {import('./query.js').QueryType | null}
+ */
+function queryType(chain, roots, site) {
+	const functions = { page: 'Page', file: 'File', user: 'User' };
+	let type = chain.args[0] === null ? roots[chain.names[0]] ?? null : functions[chain.names[0]] ? { cls: functions[chain.names[0]] } : null;
+
+	for (let i = 1; i < chain.names.length && type !== null; i++) {
+		type = queryStep(type, chain.names[i], chain.args[i], site);
+	}
+
+	return type ?? null;
+}
+
+/**
+ * What the name under the cursor in a query refers to, for Go to Definition and hover:
+ * the blueprint of a root (`page`), a field's key in the blueprint, a method of a plugin, the
+ * config or the model, or a method in Kirby's source (in the project's `kirby` folder)
+ * @param {TextDocument} document
+ * @param {number} offset
+ * @param {string} site
+ * @returns {{ name: { kind: 'member', name: string, start: number, end: number }, entry: import('./project.js').Entry & { markdown: string } } | null}
+ */
+function queryTarget(document, offset, site) {
+	const at = queryNameAt(document.getText(), offset);
+
+	if (at === null) {
+		return null;
+	}
+
+	const roots = queryRoots(document, site, at.template, offset);
+	const name = { kind: /** @type {const} */ ('member'), name: at.name, start: at.start, end: at.end };
+	const same = (candidate) => candidate.toLowerCase() === at.name.toLowerCase();
+
+	// A root: the blueprint it comes from
+	if (at.names.length === 0) {
+		const blueprint = roots[at.name]?.blueprints?.length === 1 ? entriesOf(site, 'blueprint').get(roots[at.name].blueprints[0]) : undefined;
+		return blueprint === undefined ? null : { name, entry: { ...blueprint, markdown: `**${at.name}** · ${origin(blueprint, site)}` } };
+	}
+
+	const type = queryType(at, roots, site);
+
+	if (type === null) {
+		return null;
+	}
+
+	const extra = queryExtras(type, site).find((method) => same(method.name));
+
+	if (extra !== undefined) {
+		return { name, entry: { ...extra.entry, markdown: describeMethod(extra) } };
+	}
+
+	const method = queryMethods(type.cls).find((candidate) => same(candidate.name));
+
+	if (method !== undefined) {
+		const file = path.join(path.dirname(site), 'kirby', method.file);
+		let line = -1;
+
+		try {
+			line = fs.readFileSync(file, 'utf8').split('\n').findIndex((row) => row.includes(`function ${method.name}(`));
+		} catch {
+			// no Kirby folder next to the site
+		}
+
+		return line === -1 ? null : { name, entry: { file, line, source: 'kirby', markdown: describeMethod({ ...method, origin: 'Kirby core' }) } };
+	}
+
+	// A field of the blueprint
+	for (const blueprint of hasFields(type.cls) ? type.blueprints ?? [] : []) {
+		const location = fieldLocation(blueprint, at.name, site);
+
+		if (location !== null) {
+			return { name, entry: { ...location, markdown: `**${at.name}** · ${origin(location, site)}` } };
+		}
+	}
+
+	return null;
+}
+
+/**
+ * What a name returns on a query type: a method of Kirby, a plugin or the model, else
+ * (on pages, files, users, the site and blocks) a field
+ * @param {import('./query.js').QueryType} type
+ * @param {string} name
+ * @param {string | null} args
+ * @param {string} site
+ * @returns {import('./query.js').QueryType | null}
+ */
+function queryStep(type, name, args, site) {
+	const extra = queryExtras(type, site).find((method) => method.name.toLowerCase() === name.toLowerCase());
+
+	if (extra !== undefined) {
+		return typeOfReturns(extra.returns, site);
+	}
+
+	// kirby.collection("name"): what the collection's closure returns
+	if (type.cls === 'App' && name === 'collection') {
+		const collection = entriesOf(site, 'collection').get(args?.match(/^\s*["']([^"']+)["']/)?.[1]);
+		const info = collection === undefined ? null : cached(`closure:${collection.file}:${collection.line}`, () => closureInfo(collection));
+		return classOf(info?.returns) === null ? null : { cls: classOf(info.returns) };
+	}
+
+	const method = queryMethods(type.cls).find((candidate) => candidate.name.toLowerCase() === name.toLowerCase());
+
+	if (method !== undefined) {
+		return method.type === null ? null : { cls: method.type };
+	}
+
+	return hasFields(type.cls) === true ? { cls: 'Field' } : null;
+}
+
+/**
+ * Completion in Kirby's query language in blueprints: in `query:`, `parent:` and `fetch:`,
+ * and in `{{ … }}`. Follows the chain up to the cursor (`page.children.first.`) and offers
+ * the fields (from the blueprint) and methods of what it leads to.
+ * @param {TextDocument} document
+ * @param {{ line: number, character: number }} position
+ * @param {string} site
+ */
+function queryCompletion(document, position, site) {
+	const offset = document.offsetAt(position);
+	const context = queryContext(document.getText(), offset);
+	const chain = context === null ? null : chainAt(context.expression);
+
+	if (chain === null) {
+		return null;
+	}
+
+	const roots = queryRoots(document, site, context.template, offset);
+	const range = { start: document.positionAt(offset - chain.prefix.length), end: position };
+	const item = (label, kind, detail, documentation, sortText) => ({ label, kind, detail, documentation, filterText: label, sortText, textEdit: { range, newText: label } });
+
+	if (chain.names.length === 0) {
+		return Object.entries(QUERY_ROOTS)
+			.filter(([name]) => roots[name] !== undefined || ['collection', 't', 'item'].includes(name) && (name !== 'item' || context.template))
+			.map(([name, description], index) => item(name, CompletionItemKind.Variable, roots[name]?.cls, description, String(index).padStart(2, '0')));
+	}
+
+	const type = queryType(chain, roots, site);
+
+	if (type === null) {
+		return [];
+	}
+
+	const fields = fieldsOf(hasFields(type.cls) ? type.blueprints ?? [] : [], site);
+
+	// In a query, a method without arguments is written without brackets: show just what it returns
+	const signature = (method) => method.params === '' ? method.returns ?? '' : `(${method.params})${method.returns === undefined ? '' : ': ' + method.returns}`;
+	const extras = queryExtras(type, site);
+
+	// A method of the model, a plugin or the config wins over Kirby's and over a field of the same name
+	const overridden = new Set(extras.map(({ name }) => name.toLowerCase()));
+
+	return [
+		...[...fields.values()].filter(({ name }) => overridden.has(name.toLowerCase()) === false).map((field) => item(field.name, CompletionItemKind.Field, `${field.type} · ${field.blueprints.join(', ')}`, field.label, '0' + field.name)),
+		...extras.map((method) => item(method.name, CompletionItemKind.Method, [signature(method), method.origin].filter(Boolean).join(' · '), method.description, '1' + method.name)),
+		...queryMethods(type.cls).filter(({ name }) => overridden.has(name.toLowerCase()) === false).map((method) => item(method.name, CompletionItemKind.Method, signature(method), method.description, '2' + method.name)),
+	];
 }
 
 /**
@@ -1320,6 +1604,9 @@ function lookup(textDocument, position) {
 	} else if (slot?.name) {
 		name = { kind: 'template', ...slot };
 		entry = templateEntry(templatesOf(site, slot.folder).get(slot.name));
+	} else if (blueprint === true && name === null && queryTarget(document, offset, site) !== null) {
+		// A name in a query: page.children, page.teaser …
+		({ name, entry } = queryTarget(document, offset, site));
 	} else if (blueprint === true && name === null) {
 		// A field's key: its @method line in the page's model
 		const key = fieldKeyAt(document.getText(), offset);
@@ -1571,7 +1858,7 @@ connection.onCompletion(({ textDocument, position }) => {
 		const templates = templateCompletion(document, position, site);
 		const values = valueCompletion(document, position, site);
 		const both = templates === null && values === null ? null : [...templates ?? [], ...values ?? []];
-		const items = typeCompletion(document, position) ?? extendsCompletion(document, position, site) ?? both ?? listItemCompletion(document, position, site) ?? propertyCompletion(document, position, site);
+		const items = typeCompletion(document, position) ?? queryCompletion(document, position, site) ?? extendsCompletion(document, position, site) ?? both ?? listItemCompletion(document, position, site) ?? propertyCompletion(document, position, site);
 
 		if (items !== null) {
 			return items;

@@ -1028,6 +1028,8 @@ export function controllerVariables(entry) {
  * @typedef {object} DocumentedMethod a `@method` line of a docblock
  * @property {string} name
  * @property {string} returns the type before the name, e.g. `\Kirby\Content\Field`
+ * @property {string} params what's in its brackets
+ * @property {string} [description] the text after it
  * @property {number} line 0-based
  */
 
@@ -1052,8 +1054,9 @@ export function classInfo(file, className, code = read(file)) {
 	const documented = [];
 
 	if (docblock !== null) {
-		for (const match of code.slice(docblock.start, docblock.end).matchAll(/@method\s+(?:static\s+)?([^\s(]+)\s+(\w+)\s*\(/g)) {
-			documented.push({ name: match[2], returns: match[1], line: lineAt(code, docblock.start + match.index) });
+		for (const match of code.slice(docblock.start, docblock.end).matchAll(/@method\s+(?:static\s+)?([^\s(]+)\s+(\w+)\s*\(([^)\n]*)\)[ \t]*([^\n]*)/g)) {
+			const description = match[4].replace(/\*\/\s*$/, '').trim();
+			documented.push({ name: match[2], returns: match[1], params: match[3].trim(), ...(description === '' ? {} : { description }), line: lineAt(code, docblock.start + match.index) });
 		}
 	}
 

@@ -24,6 +24,7 @@ In blueprints (`src/blueprints.js`):
 - **Template names** in `template`, `templates`, `templatesIgnore` and `create` of a `pagelist`, `template` of a `filelist`, `uploads` of a `filepicker` or `textarea`, and `options: changeTemplate`
 - **Field references** (Kirby 6): in a list of `fields` in tabs and columns, the fields defined at the top of the blueprint. Jump to Definition leads to the definition.
 - **Block types** in `fieldsets` of blocks and layout fields: the `blocks/*` blueprints of the project and Kirby
+- **Query language** in `query:`, `parent:`, `fetch:` and in `{{ … }}`/`{< … >}`: at the start `kirby`, `site`, `model`, `page`, `file`, `user` …, then along the chain (`page.children.first.`, `page.cover.toFile?.`, `kirby.collection("projects").`) what each step returns: the fields from the blueprint first (the blueprint's own page and its model; in a template below `options:` or of a list or picker field, which shows each entry, the fields of all blueprints of its kind), then the methods of plugins, the config and the model, then Kirby's. Methods only documented in a model (`@method ProjectsPage parent()`) count, too, and a model class as return type is a page with that model's blueprint (`page.parent.` offers the fields of `pages/projects`). Methods that change content (`update`, `delete` …) are left out. The methods and their return types are read from Kirby 6's source into `src/query-classes.json`. Jump to Definition and hover work on each name: a root opens its blueprint, a field its key in the blueprint, a method of a plugin, the config or the model its code, and Kirby's own methods their line in the project's `kirby` folder.
 
 For all of them:
 
@@ -60,7 +61,7 @@ The extension needs Node.js 18 or newer. It looks for `node` through the login s
 - `npm run dev`: rebuilds the server on every change
 - `npm test`: unit tests for `src/` and a test that talks to the built server over stdio (`npm run build` first)
 - `npm run lint`: ESLint
-- `npm run read-kirby -- path/to/kirby`: reads the options of each field type and Kirby's field methods from a Kirby 6 checkout into `src/field-properties.json` and `src/field-methods.json`
+- `npm run read-kirby -- path/to/kirby`: reads the options of each field type, Kirby's field methods and the methods of the classes queries use from a Kirby 6 checkout into `src/field-properties.json`, `src/field-methods.json` and `src/query-classes.json`
 
 ```
 src/
@@ -70,6 +71,8 @@ src/
 ├── calls.js      finds snippet(), collection(), t(), template() calls and file paths
 ├── php.js        reads what plugins and the config register
 ├── project.js    reads snippets, collections, translations, blueprints, templates, controllers, methods, models and the docroot
+├── query.js      Kirby's query language: where a query is, the chain at the cursor
+├── query-classes.json methods of the classes queries use (generated)
 ├── server.js     the language server
 └── variables.js  the PHP code of a file, and variables a template uses but doesn't define
 scripts/

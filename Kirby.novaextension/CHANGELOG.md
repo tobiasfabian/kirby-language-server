@@ -15,3 +15,4 @@
 - Warnings for snippets, collections, translation keys, files, blueprints and templates that don't exist
 - Only the PHP code of a file is completed and checked, not its HTML
 - What PHP's language server knows from `@var`, `@method` and stub files is left to it; hints and quick fixes for the `@method` lines of models
+- Completion of Kirby's query language in blueprints (`query:`, `parent:`, `fetch:`, `{{ … }}`), along the chain with the return types of Kirby 6's methods, and Jump to Definition and hover on each name

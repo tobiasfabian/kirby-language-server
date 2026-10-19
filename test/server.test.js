@@ -406,7 +406,8 @@ test('completes the fields of the page in a controller', async () => {
 test('completes the fields of the site, a block and pages in a snippet', async () => {
 	const site = openPhp('templates/default.php', '<?= $site-> ?>');
 	const siteItems = await request('textDocument/completion', { textDocument: { uri: site.uri }, position: site.position('$site->', 7) });
-	assert.deepEqual(siteItems.map((item) => [item.label, item.textEdit.newText]), [['footer', 'footer()'], ['contactPage', 'contactPage()']]);
+	// title is built in: the site always has it, no blueprint defines it
+	assert.deepEqual(siteItems.map((item) => [item.label, item.textEdit.newText]), [['title', 'title()'], ['footer', 'footer()'], ['contactPage', 'contactPage()']]);
 
 	const block = openPhp('snippets/blocks/text.php', '<?= $block->te ?>');
 	const blockItems = await request('textDocument/completion', { textDocument: { uri: block.uri }, position: block.position('$block->te', 10) });
@@ -578,8 +579,8 @@ test('leaves to PHP’s language server what types and docblocks tell it', async
 	assert.ok(page.includes('gallery') && page.includes('contactForm'));
 	assert.equal(page.includes('cover') || page.includes('year'), false);
 
-	// contactPage is in a stub
-	assert.deepEqual(await labels('$site-> ', 7), ['footer']);
+	// contactPage is in a stub; PHP doesn't know the site's built-in title
+	assert.deepEqual(await labels('$site-> ', 7), ['title', 'footer']);
 
 	// cover() is a Field PHP knows, toPhone is in a stub: nothing left
 	assert.deepEqual(await labels('cover()-> ', 9), []);
@@ -658,6 +659,131 @@ test('opens the snippet of a block type defined right in fieldsets', async () =>
 	const [link] = await request('textDocument/definition', { textDocument: { uri }, position: at('text:\n        fields') }) ?? [];
 	assert.equal(fileURLToPath(link.targetUri), `${project}/public/site/snippets/blocks/text.php`);
 	assert.equal(await request('textDocument/definition', { textDocument: { uri }, position: at('person:') }), null);
+});
+
+test('completes Kirby’s query language in blueprints', async () => {
+	const uri = pathToFileURL(`${project}/public/site/blueprints/pages/project.yml`).href;
+	const lines = [
+		'query: page.',
+		'query: page.children.first.',
+		'query: page.cover.toFile?.',
+		'query: kirby.collection("projects").',
+		'info: "{{ page.',
+		'query: ',
+	];
+	const text = lines.join('\n');
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'yaml', version: 9, text } } });
+	const labels = async (line) => (await request('textDocument/completion', { textDocument: { uri }, position: { line, character: lines[line].length } })).map((item) => item.label);
+
+	// The page of the blueprint: its fields first, then its model's and plugins' methods, then Kirby's
+	const page = await labels(0);
+	assert.deepEqual(page.slice(0, 6), ['cover', 'gallery', 'intro', 'text', 'metaTitle', 'metaDescription']);
+	assert.ok(page.includes('year') && page.includes('contactForm') && page.includes('children'));
+	assert.equal(page.includes('delete'), false);
+
+	assert.ok((await labels(1)).includes('blueprint'));
+
+	// The model's year() is listed once, not also as the field year, and without brackets in the detail
+	const items = await request('textDocument/completion', { textDocument: { uri }, position: { line: 0, character: lines[0].length } });
+	assert.deepEqual(items.filter((item) => item.label === 'year').map((item) => item.detail), ['int · model · site/models/project.php']);
+	assert.equal(items.find((item) => item.label === 'children').detail, 'Pages');
+	assert.ok((await labels(2)).includes('dimensions'));
+	assert.ok((await labels(3)).includes('listed'));
+
+	// A template outside a list is the page itself
+	const template = await labels(4);
+	assert.ok(template.includes('cover') && template.includes('related') === false);
+
+	assert.deepEqual(await labels(5), ['kirby', 'site', 'model', 'page', 'file', 'user', 'users', 'collection', 't']);
+});
+
+test('opens what a name in a query refers to', async () => {
+	const uri = pathToFileURL(`${project}/public/site/blueprints/pages/project.yml`).href;
+	const text = 'query: page.cover.toFile\ninfo: "{{ page.intro }}"\nquery: page.year\nquery: page.contactForm\nquery: site.children';
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'yaml', version: 10, text } } });
+
+	const at = (needle) => {
+		const lines = text.slice(0, text.indexOf(needle) + 2).split('\n');
+		return { line: lines.length - 1, character: lines.at(-1).length };
+	};
+	const open = async (needle) => {
+		const [link] = await request('textDocument/definition', { textDocument: { uri }, position: at(needle) }) ?? [];
+		return link === undefined ? null : [path.relative(`${project}/public`, fileURLToPath(link.targetUri)), link.targetSelectionRange.start.line];
+	};
+	const lineOf = (file, needle) => fs.readFileSync(`${project}/public/${file}`, 'utf8').split('\n').findIndex((line) => line.includes(needle));
+
+	assert.deepEqual(await open('page.cover'), ['site/blueprints/pages/project.yml', 0]);
+	assert.deepEqual(await open('cover.toFile'), ['site/blueprints/pages/project.yml', lineOf('site/blueprints/pages/project.yml', 'cover:')]);
+	assert.deepEqual(await open('toFile'), ['kirby/src/Content/FieldMethods.php', lineOf('kirby/src/Content/FieldMethods.php', 'function toFile(')]);
+	// A template outside a list is the page itself
+	assert.deepEqual(await open('intro }}'), ['site/blueprints/pages/project.yml', lineOf('site/blueprints/pages/project.yml', 'intro:')]);
+	assert.deepEqual(await open('year'), ['site/models/project.php', lineOf('site/models/project.php', 'function year')]);
+	assert.deepEqual(await open('contactForm'), ['site/plugins/site-contact/index.php', lineOf('site/plugins/site-contact/index.php', `'contactForm'`)]);
+
+	// No Kirby source for Site::children in the fixture
+	assert.equal(await open('children'), null);
+
+	const hover = await request('textDocument/hover', { textDocument: { uri }, position: at('toFile') });
+	assert.match(hover.contents.value, /toFile\(\): File\|null[\s\S]*Kirby core/);
+});
+
+test('knows methods only documented with @method in a model', async () => {
+	const uri = pathToFileURL(`${project}/public/site/blueprints/pages/project.yml`).href;
+	const text = 'query: page.pare\nquery: page.parent.\nquery: page.parent.featured';
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'yaml', version: 11, text } } });
+	const lines = text.split('\n');
+	const complete = async (line) => request('textDocument/completion', { textDocument: { uri }, position: { line, character: lines[line].length } });
+
+	const parent = (await complete(0)).filter((item) => item.label === 'parent');
+	assert.deepEqual(parent.map((item) => [item.detail, item.documentation]), [['ProjectsPage · @method · site/models/project.php', 'The projects page']]);
+
+	// ProjectsPage is the model of pages/projects: its fields and methods follow
+	const labels = (await complete(1)).map((item) => item.label);
+	assert.ok(labels.includes('cover') && labels.includes('featured'));
+
+	const model = `${project}/public/site/models/project.php`;
+	const [link] = await request('textDocument/definition', { textDocument: { uri }, position: { line: 2, character: 'query: page.par'.length } });
+	assert.deepEqual([fileURLToPath(link.targetUri), link.targetSelectionRange.start.line], [model, fs.readFileSync(model, 'utf8').split('\n').findIndex((line) => line.includes('parent()'))]);
+});
+
+test('knows the built-in title of the site', async () => {
+	const uri = pathToFileURL(`${project}/public/site/blueprints/pages/project.yml`).href;
+	const text = 'query: site.ti\nquery: site.title';
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'yaml', version: 12, text } } });
+
+	const items = await request('textDocument/completion', { textDocument: { uri }, position: { line: 0, character: 14 } });
+	assert.equal(items.find((item) => item.label === 'title').detail, 'text · site');
+
+	// No blueprint defines it, so there's nowhere to jump
+	assert.equal(await request('textDocument/definition', { textDocument: { uri }, position: { line: 1, character: 14 } }), null);
+});
+
+test('tells the page itself from each entry in {{ }}', async () => {
+	const uri = pathToFileURL(`${project}/public/site/blueprints/pages/project.yml`).href;
+	const lines = [
+		'fields:',
+		'  note:',
+		'    type: info',
+		'    text: "{{ page.ye',
+		'  list:',
+		'    type: pagelist',
+		'    info: "{{ page.ye',
+		'  pick:',
+		'    type: select',
+		'    options:',
+		'      type: query',
+		'      query: site.children',
+		'      text: "{{ page.ye',
+	];
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'yaml', version: 13, text: lines.join('\n') } } });
+	const year = async (line) => (await request('textDocument/completion', { textDocument: { uri }, position: { line, character: lines[line].length } })).find((item) => item.label === 'year')?.detail;
+
+	// An info field shows the page itself: its model's year()
+	assert.equal(await year(3), 'int · model · site/models/project.php');
+
+	// A pagelist and options show each entry: the field year of the page blueprints
+	assert.equal(await year(6), 'number · pages/project');
+	assert.equal(await year(12), 'number · pages/project');
 });
 
 test('completes the themes of an info field', async () => {

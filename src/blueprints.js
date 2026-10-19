@@ -879,6 +879,24 @@ export function fieldKeyAt(text, offset) {
 	return found;
 }
 
+/**
+ * Where a string template (`{{ … }}`) is: below `options:` (each option's entry), and the
+ * field whose key it's the value of (`info:` of a `pagelist` shows each entry, of an `info`
+ * field the page itself). The server decides by the field's type.
+ * @param {string} text
+ * @param {number} offset
+ * @returns {{ inOptions: boolean, field: FieldAtLine | null }}
+ */
+export function templatePlace(text, offset) {
+	const { before, lines } = positionInfo(text, offset);
+	const indent = before.length - before.trimStart().length;
+
+	return {
+		inOptions: ancestors(lines, lines.length - 1, indent).some(({ key }) => key === 'options'),
+		field: fieldOfLine(text, lines, indent),
+	};
+}
+
 // Values of options that Kirby's source only types as string, from the docs:
 // https://getkirby.com/docs/reference/panel/fields/info#themes
 const OPTION_VALUES = {
