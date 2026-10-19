@@ -859,3 +859,19 @@ export function fieldKeyAt(text, offset) {
 
 	return found;
 }
+
+// Values of options that Kirby's source only types as string, from the docs:
+// https://getkirby.com/docs/reference/panel/fields/info#themes
+const OPTION_VALUES = {
+	info: { theme: ['info', 'positive', 'negative', 'notice', 'warning', 'passive', 'text', 'dark', 'code', 'empty', 'none'] },
+};
+
+/**
+ * The values an option of a field type takes, if they're known: the themes of an `info` field
+ * @param {string} type
+ * @param {string} option
+ * @returns {string[]}
+ */
+export function optionValues(type, option) {
+	return OPTION_VALUES[ALIASES[type] ?? type]?.[option] ?? [];
+}

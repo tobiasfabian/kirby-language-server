@@ -659,3 +659,13 @@ test('opens the snippet of a block type defined right in fieldsets', async () =>
 	assert.equal(fileURLToPath(link.targetUri), `${project}/public/site/snippets/blocks/text.php`);
 	assert.equal(await request('textDocument/definition', { textDocument: { uri }, position: at('person:') }), null);
 });
+
+test('completes the themes of an info field', async () => {
+	const uri = pathToFileURL(`${project}/public/site/blueprints/pages/options.yml`).href;
+	const text = 'fields:\n  note:\n    type: info\n    theme: ';
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'yaml', version: 2, text } } });
+
+	const items = await request('textDocument/completion', { textDocument: { uri }, position: { line: 3, character: 11 } });
+	assert.deepEqual(items.map((item) => item.label), ['info', 'positive', 'negative', 'notice', 'warning', 'passive', 'text', 'dark', 'code', 'empty', 'none']);
+	assert.equal(items[0].detail, 'default');
+});

@@ -15,7 +15,7 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldKeyAt, fieldKeyOffset, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
+import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldKeyAt, fieldKeyOffset, optionValues, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
 import { completionContext, fieldContext, fieldMethodContext, findCalls, memberAt, nameAt, propsContext, variableAt, variableContext } from './calls.js';
 import { classInfo, classMethods, closureInfo, collectionSignature, controllerVariables, findAsset, findSites, listBlueprints, listCollections, listControllers, listDocroot, listMethods, listModels, listSnippets, listStubs, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
 import { isInPhp, phpOnly, undefinedVariables } from './variables.js';
@@ -422,8 +422,9 @@ function typeOfField(field, site) {
  */
 function valueCompletion(document, position, site) {
 	const context = valueContext(document.getText(), document.offsetAt(position));
-	const option = context === null ? undefined : fieldProperties(typeOfField(context, site))?.find(({ name }) => name === context.key);
-	const values = option === undefined ? [] : literalValues(option.type);
+	const type = context === null ? null : typeOfField(context, site);
+	const option = context === null ? undefined : fieldProperties(type)?.find(({ name }) => name === context.key);
+	const values = option === undefined ? [] : [...optionValues(type, context.key), ...literalValues(option.type)];
 
 	if (values.length === 0) {
 		return null;
@@ -434,8 +435,8 @@ function valueCompletion(document, position, site) {
 	return values.map((value, index) => ({
 		label: value,
 		kind: CompletionItemKind.Value,
-		// An option without a default is null
-		detail: value === (option.default ?? 'null') ? 'default' : undefined,
+		// An option without a default is null (for theme the docs name info)
+		detail: value === (option.default ?? (context.key === 'theme' ? 'info' : 'null')) ? 'default' : undefined,
 		documentation: option.description,
 		filterText: value,
 		sortText: '2' + index,
