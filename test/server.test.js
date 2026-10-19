@@ -239,9 +239,10 @@ test('completes the variables a snippet expects', async () => {
 		position: positionOf(`'size' => 'large'`, 3),
 	});
 
-	assert.deepEqual(items.map((item) => item.label), ['page', 'size']);
-	assert.equal(items[1].detail, '= \'medium\'');
-	assert.equal(items[1].textEdit.newText, 'size');
+	// $page is there anyway, like $kirby and $site
+	assert.deepEqual(items.map((item) => item.label), ['size']);
+	assert.equal(items[0].detail, '= \'medium\'');
+	assert.equal(items[0].textEdit.newText, 'size');
 });
 
 test('completes file paths in the docroot', async () => {

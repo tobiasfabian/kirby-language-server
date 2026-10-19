@@ -8,7 +8,7 @@ In PHP files:
 	- snippets from `site/snippets`, plugins, the config and Kirby's block snippets, with the variables they expect
 	- collections from `site/collections`, plugins and `'extensions'` in the config, with their signature
 	- translation keys from `site/languages`, plugins and the config, then Kirby's own from `kirby/i18n/translations`, with their text in each language
-- **Snippet variables**: in `snippet('m-card', ['…` the keys the snippet expects, with type and default
+- **Snippet variables**: in `snippet('m-card', ['…` the keys the snippet expects, with type and default. Not `$page`, `$site`, `$kirby` and `$pages`, which every snippet has anyway, nor `$slot`/`$slots`, which can't be passed.
 - **File paths** in `hashedUrl('…')`, `asset('…')`, `svg('…')`, `css('…')`, `js('…')` and `url('assets/…')`: the files and folders in the docroot (the folder of Kirby's `index.php`). URLs, `@auto` and files in `media/` aren't checked.
 - **Template names** in `->template('…')`, `->notTemplate('…')`, `->changeTemplate('…')` and `filterBy('template', …)`
 - **Field names** after `$page->`, `$site->`, `$block->` and `$this->` (in a model): the fields of the blueprint that store content (from tabs, columns, groups and what they extend; no lists or info fields), inserted as `name()`. `$page` in a template, controller or model is the page of that template (`pages/default` without a blueprint of its own), `$block` in `snippets/blocks/<type>.php` that block, `$site` the site. In other snippets `$page` offers the fields of all page blueprints.
