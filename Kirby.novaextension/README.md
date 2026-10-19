@@ -39,7 +39,7 @@ For all of them:
 
 Fallbacks such as `snippet(['m-card-project', 'm-card'])` are understood. Names built at runtime, like `snippet('blocks/' . $block->type())`, are not checked.
 
-Hover and ⌘-click don't work while Nova's built-in PHP language server (Intelephense) is on: Nova then asks only Intelephense. Without it, hover works, but ⌘-click still doesn't jump. That's why opening is a command of its own.
+In blueprints, ⌘-click works on keys: a field's key leads to its `@method` line in the model. On strings like `fields/seo`, Nova offers no ⌘-click; use Jump to Definition from the context menu or ⌃⌥⌘O there. In PHP files, Go to Definition and hover are left to Intelephense, so it keeps working whichever extension starts first; use ⌃⌥⌘O for Kirby's names there.
 
 ## Requirements
 

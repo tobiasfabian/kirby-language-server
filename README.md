@@ -40,7 +40,7 @@ For all of them:
 - **Hover** with the same information as the completion
 - **Code lenses** with each snippet's or collection's origin above its line (not shown in Nova)
 
-In Nova, Jump to Definition is the command **Open Referenced File** (⌃⌥⌘O). While Nova's built-in PHP language server (Intelephense) is on, Nova asks only that server for hover and ⌘-click. Without it, hover works but ⌘-click still doesn't jump; code lenses never appear. The completion list shows the same information as the hover.
+In Nova, the server offers Go to Definition and hover only in blueprints, so it never takes them from the Intelephense extension in PHP: Nova asks only the first language server started for a language. In PHP, the command **Open Referenced File** (⌃⌥⌘O) jumps instead. In blueprints, ⌘-click works on keys (a field's key leads to its `@method` line in the model); on strings like `fields/seo` Nova offers no ⌘-click, so use **Jump to Definition** from the context menu or ⌃⌥⌘O. Code lenses never appear. The completion list shows the same information as the hover.
 
 The server reads the project's files (blueprints with the [yaml](https://eemeli.org/yaml/) package); it doesn't start Kirby. It finds the `site` folder within three levels of the project root (`site/`, `public/site/` …).
 

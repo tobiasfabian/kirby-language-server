@@ -3,6 +3,8 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
 	CodeActionKind,
+	DefinitionRequest,
+	HoverRequest,
 	CompletionItemKind,
 	CompletionItemTag,
 	createConnection,
@@ -29,6 +31,10 @@ let sites = null;
 
 // Whether the editor understands LocationLink, which also names the clicked range
 let definitionLinks = false;
+
+// The languages to offer Go to Definition and hover for, if the editor asks for only some
+// (`initializationOptions.navigation`, e.g. Nova: only YAML, so PHP stays with Intelephense)
+let navigation = null;
 
 const cache = new Map();
 const validationTimers = new Map();
@@ -1579,13 +1585,17 @@ connection.onInitialize((params) => {
 	workspaceFolders = [...new Set(workspaceFolders)];
 	definitionLinks = params.capabilities?.textDocument?.definition?.linkSupport === true;
 
+	// Limiting to some languages needs registering at runtime
+	const dynamic = params.capabilities?.textDocument?.definition?.dynamicRegistration === true && params.capabilities?.textDocument?.hover?.dynamicRegistration === true;
+	navigation = dynamic && Array.isArray(params.initializationOptions?.navigation) ? params.initializationOptions.navigation : null;
+
 	return {
 		capabilities: {
 			textDocumentSync: TextDocumentSyncKind.Incremental,
 			// A space for `type: ` in blueprints, `>` for `$page->`, `$` for variables
 			completionProvider: { triggerCharacters: ['\'', '"', '/', ' ', '>', '$'] },
-			definitionProvider: true,
-			hoverProvider: true,
+			definitionProvider: navigation === null,
+			hoverProvider: navigation === null,
 			codeLensProvider: { resolveProvider: false },
 			codeActionProvider: { codeActionKinds: [CodeActionKind.QuickFix] },
 		},
@@ -1594,6 +1604,13 @@ connection.onInitialize((params) => {
 
 connection.onInitialized(() => {
 	connection.console.log(`Kirby sites: ${allSites().join(', ') || 'none found'}`);
+
+	// Requests for other languages still get an answer, e.g. from Nova's Open Referenced File
+	if (navigation !== null) {
+		const documentSelector = navigation.map((language) => ({ language }));
+		connection.client.register(DefinitionRequest.type, { documentSelector });
+		connection.client.register(HoverRequest.type, { documentSelector });
+	}
 });
 
 connection.onCompletion(({ textDocument, position }) => {

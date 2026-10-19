@@ -72,6 +72,9 @@ function start(node) {
 		},
 		{
 			syntaxes: ['php', 'yaml'],
+			// Nova asks only the first language server of a language for Go to Definition and
+			// hover. In PHP that must stay Intelephense; Open Referenced File covers PHP.
+			initializationOptions: { navigation: ['yaml'] },
 		},
 	);
 
@@ -87,8 +90,9 @@ function start(node) {
 
 /**
  * Opens the snippet, collection or translation under the cursor.
- * Nova sends ⌘-click and hover in PHP files only to its own PHP language
- * server, so this command asks the Kirby server directly.
+ * Nova sends Jump to Definition in PHP files only to the Intelephense
+ * extension, and ⌘-click on strings to no server at all, so this command
+ * asks the Kirby server directly.
  * @param {TextEditor} editor
  */
 async function openAtCursor(editor) {
