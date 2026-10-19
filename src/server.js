@@ -17,7 +17,7 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldKeyAt, fieldKeyOffset, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
 import { completionContext, fieldContext, fieldMethodContext, findCalls, memberAt, nameAt, propsContext, variableAt, variableContext } from './calls.js';
-import { classInfo, classMethods, closureInfo, collectionSignature, controllerVariables, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listControllers, listDocroot, listMethods, listModels, listSnippets, listStubs, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
+import { classInfo, classMethods, closureInfo, collectionSignature, controllerVariables, findAsset, findSites, listBlueprints, listCollections, listControllers, listDocroot, listMethods, listModels, listSnippets, listStubs, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
 import { isInPhp, phpOnly, undefinedVariables } from './variables.js';
 
 const connection = createConnection(ProposedFeatures.all);
@@ -648,43 +648,9 @@ function variableCompletion(document, position, site) {
 }
 
 /**
- * The type of a variable a controller returns, where it can be read for sure:
- * `new Foo()`, a variable of `compact()` with an `@var` line or `new` in the controller,
- * or `$page->method()` of the page's model with a return type. Otherwise `mixed`.
- * @param {TemplateVariable} variable
- * @param {import('./project.js').Method[]} modelMethods
- */
-function variableType(variable, modelMethods) {
-	const value = variable.value.trim();
-	const created = value.match(/^new\s+(\\?[\w\\]+)/);
-
-	if (created !== null) {
-		return created[1];
-	}
-
-	const compacted = value.match(/^\$(\w+)$/);
-	let code = '';
-
-	try {
-		code = compacted === null ? '' : fs.readFileSync(variable.entry.file, 'utf8');
-	} catch {
-		// the controller can't be read
-	}
-
-	const documented = compacted === null ? null : code.match(new RegExp(`@var\\s+([^\\s$]+)\\s+\\$${compacted[1]}\\b`)) ?? code.match(new RegExp(`\\$${compacted[1]}\\s*=\\s*new\\s+(\\\\?[\\w\\\\]+)`));
-
-	if (documented !== null) {
-		return documented[1];
-	}
-
-	const method = value.match(/^\$page->(\w+)\(\)$/);
-	return modelMethods.find(({ name }) => name === method?.[1])?.returns ?? 'mixed';
-}
-
-/**
  * The variables a template in `site/templates` uses that come from Kirby or its controllers
  * but have no `@var` line, so PHP's language server reports them as undefined: each with its
- * first use and the type for its line (the page's model, Kirby's classes, see `variableType`)
+ * first use and the type for its line (the page's model, Kirby's classes, else `mixed`)
  * @param {TextDocument} document
  * @param {string} site
  * @returns {{ name: string, type: string, start: number, end: number }[]}
@@ -699,9 +665,7 @@ function missingVarDocs(document, site) {
 	}
 
 	const declared = new Set([...document.getText().matchAll(/@var\s+[^\s$]+\s+\$(\w+)/g)].map(([, name]) => name));
-	const template = path.basename(file).split('.')[0];
-	const model = cached('models:' + site, () => listModels(site)).get(template);
-	const modelMethods = model === undefined ? [] : cached(`model:${model.file}`, () => classMethods(model.file, model.className));
+	const model = cached('models:' + site, () => listModels(site)).get(path.basename(file).split('.')[0]);
 	const missing = new Map();
 
 	for (const { name, start, end } of used) {
@@ -710,7 +674,7 @@ function missingVarDocs(document, site) {
 		}
 
 		if (data.variables.has(name) === true) {
-			missing.set(name, { name, type: variableType(data.variables.get(name), modelMethods), start, end });
+			missing.set(name, { name, type: 'mixed', start, end });
 		} else if (TEMPLATE_DATA[name] !== undefined) {
 			missing.set(name, { name, type: name === 'page' && model?.className ? model.className : '\\' + TEMPLATE_DATA[name], start, end });
 		}
@@ -977,13 +941,12 @@ function blueprintFinder(site) {
 }
 
 /**
- * @typedef {{ blueprint?: import('./project.js').Entry, template?: import('./project.js').Entry, content?: import('./project.js').Entry }} Template
+ * @typedef {{ blueprint?: import('./project.js').Entry, template?: import('./project.js').Entry }} Template
  */
 
 /**
  * The template names of a site with what defines them: for `pages` the page
- * blueprints, the templates in `site/templates` (or of plugins) and the templates
- * pages in the content folder use; for `files` the file blueprints
+ * blueprints and the templates in `site/templates` (or of plugins); for `files` the file blueprints
  * @param {string} site
  * @param {'pages' | 'files'} folder
  * @returns {Map<string, Template>}
@@ -1004,11 +967,6 @@ function templatesOf(site, folder) {
 			for (const [name, template] of listTemplates(site)) {
 				templates.set(name, { ...templates.get(name), template });
 			}
-
-			// Reading the content folder takes a while on big sites
-			for (const [name, content] of cached('content-templates:' + site, () => listContentTemplates(site), 60000)) {
-				templates.set(name, { ...templates.get(name), content });
-			}
 		}
 
 		return templates;
@@ -1016,12 +974,15 @@ function templatesOf(site, folder) {
 }
 
 /**
- * What to open and describe for a template: its blueprint, else its template file, else a content file using it
+ * What to open and describe for a template: its blueprint, else its template file
  * @param {Template | undefined} template
  */
 function templateEntry(template) {
-	return template?.blueprint ?? template?.template ?? template?.content;
+	return template?.blueprint ?? template?.template;
 }
+
+// Page templates Kirby uses without a blueprint or template file of their own: the error page
+const KNOWN_TEMPLATES = ['error'];
 
 /**
  * Completion items for template names
@@ -1143,7 +1104,6 @@ function origin(entry, site) {
 		plugin: `plugin ${entry.plugin} · ${file}`,
 		config: `config · ${file}`,
 		kirby: 'Kirby core',
-		content: file,
 	}[entry.source];
 }
 
@@ -1168,7 +1128,7 @@ function describe(kind, name, entry, site) {
 	if (kind === 'template') {
 		const page = templatesOf(site, 'pages').get(name);
 		const file = templatesOf(site, 'files').get(name);
-		const places = [['blueprint', page?.blueprint], ['template', page?.template], ['used by', page?.content], ['file blueprint', file?.blueprint]];
+		const places = [['blueprint', page?.blueprint], ['template', page?.template], ['file blueprint', file?.blueprint]];
 
 		return [`**${name}**`, '', ...places.filter(([, place]) => place !== undefined).map(([label, place]) => `- ${label}: ${origin(place, site)}`)].join('\n');
 	}
@@ -1301,8 +1261,7 @@ function memberEntry(document, member, site) {
 
 /**
  * Where the model of a page documents a field of its blueprint: its `@method` line, or a
- * method of the same name (which wins over the field). For a partial (`tabs/seo`), the models
- * of the page blueprints that extend it.
+ * method of the same name (which wins over the field). Only in page blueprints themselves.
  * @param {TextDocument} document the blueprint
  * @param {string} field
  * @param {string} site
@@ -1310,34 +1269,12 @@ function memberEntry(document, member, site) {
  */
 function modelDocEntry(document, field, site) {
 	const own = ownName(document, site);
-	const blueprints = entriesOf(site, 'blueprint');
-	const models = cached('models:' + site, () => listModels(site));
+	const model = own?.startsWith('pages/') ? cached('models:' + site, () => listModels(site)).get(own.slice('pages/'.length)) : undefined;
+	const info = model === undefined ? null : classInfo(model.file, model.className);
+	const same = ({ name }) => name.toLowerCase() === field.toLowerCase();
+	const line = info?.documented.find(same)?.line ?? info?.methods.find(same)?.line;
 
-	// The page blueprints this one is, or that use it
-	const pages = own?.startsWith('pages/') ? [own] : [...blueprints].filter(([name, entry]) => {
-		if (name.startsWith('pages/') === false || entry.inline === true) {
-			return false;
-		}
-
-		try {
-			return blueprintReferences(fs.readFileSync(entry.file, 'utf8')).some((reference) => reference.name === own);
-		} catch {
-			return false;
-		}
-	}).map(([name]) => name);
-
-	for (const page of pages) {
-		const model = models.get(page.slice('pages/'.length));
-		const info = model === undefined ? null : classInfo(model.file, model.className);
-		const same = ({ name }) => name.toLowerCase() === field.toLowerCase();
-		const line = info?.documented.find(same)?.line ?? info?.methods.find(same)?.line;
-
-		if (line !== undefined) {
-			return { file: model.file, line, source: 'site' };
-		}
-	}
-
-	return undefined;
+	return line === undefined ? undefined : { file: model.file, line, source: 'site' };
 }
 
 /**
@@ -1502,7 +1439,7 @@ function validate(document) {
 		// Every template of a list must exist
 		if (call.kind === 'template') {
 			const templates = entriesOf(site, 'template');
-			diagnostics.push(...call.names.filter(({ name }) => templates.has(name) === false).map((name) => templateDiagnostic(document, site, name, null)));
+			diagnostics.push(...call.names.filter(({ name }) => templates.has(name) === false && KNOWN_TEMPLATES.includes(name) === false).map((name) => templateDiagnostic(document, site, name, null)));
 			continue;
 		}
 
@@ -1557,7 +1494,7 @@ function validate(document) {
 		diagnostics.push(...blueprintDiagnostics(document, site), ...referenceDiagnostics(document, site));
 
 		for (const slot of slotsOf(document, site)) {
-			if (slot.name && templatesOf(site, slot.folder).has(slot.name) === false) {
+			if (slot.name && templatesOf(site, slot.folder).has(slot.name) === false && (slot.folder === 'files' || KNOWN_TEMPLATES.includes(slot.name) === false)) {
 				diagnostics.push(templateDiagnostic(document, site, slot, slot.folder));
 			}
 		}
@@ -1596,7 +1533,6 @@ connection.onInitialize((params) => {
 			completionProvider: { triggerCharacters: ['\'', '"', '/', ' ', '>', '$'] },
 			definitionProvider: navigation === null,
 			hoverProvider: navigation === null,
-			codeLensProvider: { resolveProvider: false },
 			codeActionProvider: { codeActionKinds: [CodeActionKind.QuickFix] },
 		},
 	};
@@ -1736,31 +1672,6 @@ connection.onCodeAction(({ textDocument, range, context }) => {
 	const site = document ? siteFor(document.uri) : null;
 
 	return site === null ? [] : [...modelCodeActions(document, site, range, context.diagnostics), ...varDocCodeActions(document, site, range, context.diagnostics)];
-});
-
-connection.onCodeLens(({ textDocument }) => {
-	const document = documents.get(textDocument.uri);
-	const site = document ? siteFor(document.uri) : null;
-
-	if (site === null) {
-		return [];
-	}
-
-	return findCalls(codeOf(document)).filter((call) => call.kind === 'snippet' || call.kind === 'collection').flatMap((call) => {
-		const entries = entriesOf(site, call.kind);
-		const found = call.names.map(({ name }) => entries.get(name)).find((entry) => entry !== undefined);
-
-		if (found === undefined) {
-			return [];
-		}
-
-		const start = document.positionAt(call.names[0].start);
-
-		return [{
-			range: { start, end: start },
-			command: { title: origin(found, site), command: '' },
-		}];
-	});
 });
 
 documents.onDidOpen(({ document }) => validate(document));

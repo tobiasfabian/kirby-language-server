@@ -143,15 +143,6 @@ test('jumps to a collection defined in a plugin', async () => {
 	assert.equal(link.targetSelectionRange.start.line, fs.readFileSync(fileURLToPath(link.targetUri), 'utf8').split('\n').findIndex((line) => line.includes(`'contact-forms'`)));
 });
 
-test('shows the origin above each call', async () => {
-	const lenses = await request('textDocument/codeLens', { textDocument: { uri: templateUri } });
-	const titles = lenses.map((lens) => lens.command.title);
-
-	assert.ok(titles.includes('site/snippets/m-card.php'));
-	assert.ok(titles.includes('plugin site-contact · site/plugins/site-contact/snippets/m-form-contact.php'));
-	assert.ok(titles.includes('config · site/config/config.php'));
-});
-
 /**
  * Waits for the diagnostics of a document
  * @param {string} uri
@@ -335,14 +326,13 @@ test('completes page and file templates in blueprints', async () => {
 	const pages = await request('textDocument/completion', { textDocument: { uri }, position: position('- note', 2) });
 	const labels = pages.map((item) => item.label);
 
-	for (const name of ['project', 'note', 'contact', 'default', 'projects', 'error']) {
+	for (const name of ['project', 'note', 'contact', 'default', 'projects']) {
 		assert.ok(labels.includes(name), name);
 	}
 
 	assert.equal(labels.includes('image'), false);
 	assert.equal(labels.includes('project.json'), false);
 	assert.match(pages.find((item) => item.label === 'contact').documentation.value, /- blueprint: plugin site-contact/);
-	assert.equal(pages.find((item) => item.label === 'error').detail, 'content/error/error.de.txt');
 
 	const files = await request('textDocument/completion', { textDocument: { uri }, position: position('template: image', 'template: '.length) });
 	assert.deepEqual(files.map((item) => item.label).sort(), ['default', 'image']);
@@ -651,7 +641,8 @@ test('opens the @method line of a blueprint field in the model', async () => {
 	};
 
 	assert.deepEqual(await open('pages/project', 'cover:'), [model, lineOf('cover()')]);
-	assert.deepEqual(await open('tabs/seo', 'metaTitle:'), [model, lineOf('metaTitle()')]);
+	// Not from a partial: which model it belongs to isn't clear
+	assert.equal(await open('tabs/seo', 'metaTitle:'), null);
 	assert.equal(await open('pages/project', 'text:'), null);
 });
 

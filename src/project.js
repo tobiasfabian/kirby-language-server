@@ -23,7 +23,7 @@ const KIRBY_BLOCKS = ['code', 'gallery', 'heading', 'image', 'line', 'list', 'ma
  * @typedef {object} Entry
  * @property {string} file
  * @property {number} line 0-based line where it's defined
- * @property {'site' | 'plugin' | 'config' | 'kirby' | 'content'} source
+ * @property {'site' | 'plugin' | 'config' | 'kirby'} source
  * @property {string} [plugin] folder name of the plugin
  * @property {boolean} [inline] defined in PHP code (a blueprint as an array or closure), not in a file of its own
  */
@@ -780,53 +780,6 @@ export function listTemplates(site) {
 	return new Map([...templates].filter(([name]) => /[./]/.test(name) === false));
 }
 
-/**
- * The templates that pages in the content folder use, from the names of their
- * content files (`project.txt`, `project.de.txt`). A page may use a template
- * that has neither a blueprint nor a template file, like `error`.
- * File meta data (`photo.jpg.txt`) and `site.txt` are left out.
- * @param {string} site
- * @returns {Map<string, Entry>}
- */
-export function listContentTemplates(site) {
-	const templates = new Map();
-	const root = [path.join(path.dirname(site), 'content'), path.join(findDocroot(site), 'content')].find((folder) => fs.existsSync(folder));
-
-	/** @param {string} folder */
-	function walk(folder) {
-		let entries;
-
-		try {
-			entries = fs.readdirSync(folder, { withFileTypes: true });
-		} catch {
-			return;
-		}
-
-		for (const entry of entries) {
-			if (entry.name.startsWith('.') === true) {
-				continue;
-			}
-
-			if (entry.isDirectory() === true) {
-				walk(path.join(folder, entry.name));
-				continue;
-			}
-
-			// The language code, if any, then the template
-			const name = entry.name.endsWith('.txt') ? entry.name.slice(0, -4).replace(/\.[a-z]{2}(?:[-_][a-z]{2,4})?$/i, '') : '';
-
-			if (name !== '' && name.includes('.') === false && (folder !== root || name !== 'site') && templates.has(name) === false) {
-				templates.set(name, { file: path.join(folder, entry.name), line: 0, source: 'content' });
-			}
-		}
-	}
-
-	if (root !== undefined) {
-		walk(root);
-	}
-
-	return templates;
-}
 
 /**
  * The page, site, field or block methods that plugins and the config register

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { extend } from '../src/blueprints.js';
-import { collectionSignature, controllerVariables, findAsset, findDocroot, findSites, listBlueprints, listCollections, listContentTemplates, listControllers, listDocroot, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from '../src/project.js';
+import { collectionSignature, controllerVariables, findAsset, findDocroot, findSites, listBlueprints, listCollections, listControllers, listDocroot, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from '../src/project.js';
 
 const project = fileURLToPath(new URL('./fixtures/project', import.meta.url));
 const site = path.join(project, 'public', 'site');
@@ -170,13 +170,6 @@ test('lists templates from the site and plugins', () => {
 
 	assert.deepEqual([...templates.keys()].sort(), ['contact', 'default', 'note']);
 	assert.equal(templates.get('contact')?.plugin, 'site-contact');
-});
-
-test('lists the templates pages in the content folder use', () => {
-	const templates = listContentTemplates(site);
-
-	assert.deepEqual([...templates.keys()].sort(), ['error', 'project']);
-	assert.equal(templates.get('error')?.file, path.join(project, 'public/content/error/error.de.txt'));
 });
 
 test('reads what controllers return', (t) => {

@@ -22,7 +22,7 @@ In blueprints:
 - At a key of a field, the options of its type are offered, with their type, default and description: `counter`, `maxlength` … for a `text` field, `templates`, `layout` … for a `pagelist`. Options the field already has are left out. In the value of a boolean option, `true`, `false` and (if it may be empty) `null` are offered, the default marked: `translate: ` offers `true` (default), `false` and `null`.
 - `extends: ` and the shorthand `seo: fields/seo` (in `fields`, `tabs` and `sections`) offer the project's blueprints, those of the fitting folder first.
 - In a list of `fields` (Kirby 6: `fields: [intro, text]` in tabs and columns), the fields defined at the top of the blueprint; in `fieldsets`, the block types.
-- Template names in `template:`/`templates:`/`create:` of a `pagelist`, `template:` of a `filelist`, `uploads:` of a `filepicker` or `textarea` and `options: changeTemplate:` offer the page (or file) templates: from blueprints, `site/templates`, plugins, and the pages in the content folder.
+- Template names in `template:`/`templates:`/`create:` of a `pagelist`, `template:` of a `filelist`, `uploads:` of a `filepicker` or `textarea` and `options: changeTemplate:` offer the page (or file) templates: from blueprints, `site/templates` and plugins.
 
 For all of them:
 
@@ -33,9 +33,9 @@ For all of them:
 - **Warnings** mark names that don't exist.
 	- `t('key', 'Fallback')` with a fallback text isn't flagged. If a plugin loads its translations at runtime (e.g. from JSON files), missing keys are only a hint, because they might come from there.
 	- `intro: textarea` is marked too, because Kirby reads it as `extends` and not as the type.
-	- A template exists if there's a blueprint, a template file or a page that uses it. For file templates without a blueprint it's only a hint, because Kirby falls back to `files/default`.
+	- A template exists if there's a blueprint or a template file; `error` is always known. For file templates without a blueprint it's only a hint, because Kirby falls back to `files/default`.
 	- Field references that aren't defined at the top of the blueprint, and block types in `fieldsets` without a blueprint.
-	- In a template, `$page`, `$site` and controller variables without an `@var` line get a hint, because Intelephense reports them as undefined. A quick fix adds the lines with their types (the page's model, Kirby's classes, the controller's types where they're sure).
+	- In a template, `$page`, `$site` and controller variables without an `@var` line get a hint, because Intelephense reports them as undefined. A quick fix adds the lines with their types (the page's model, Kirby's classes, `mixed` for controller variables).
 
 Fallbacks such as `snippet(['m-card-project', 'm-card'])` are understood. Names built at runtime, like `snippet('blocks/' . $block->type())`, are not checked.
 
