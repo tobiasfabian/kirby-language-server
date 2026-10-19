@@ -930,7 +930,7 @@ function referenceDiagnostics(document, site) {
 	const { blueprints, complete } = blueprintsOf(site);
 
 	for (const reference of fieldsetReferences(document.getText())) {
-		if (blueprints.has(reference.blueprint) === false) {
+		if (reference.inline !== true && blueprints.has(reference.blueprint) === false) {
 			const message = `Block type “${reference.name}” has no blueprint.`;
 			warn(reference.start, reference.end, complete ? message : message + ' (a plugin may add it)', complete ? DiagnosticSeverity.Warning : DiagnosticSeverity.Information);
 		}
@@ -1354,7 +1354,10 @@ function lookup(textDocument, position) {
 
 	if (reference !== null) {
 		name = { kind: 'blueprint', ...reference };
-		entry = entriesOf(site, 'blueprint').get(reference.name);
+
+		// A block type defined right in fieldsets, or without blueprint: the snippet that renders it
+		const snippet = fieldset === null ? undefined : entriesOf(site, 'snippet').get(fieldset.blueprint);
+		entry = fieldset?.inline === true ? snippet : entriesOf(site, 'blueprint').get(reference.name) ?? snippet;
 	} else if (field !== null) {
 		// A field defined at the top of this blueprint
 		const at = definitionsOf(document, site)?.get(field.name) ?? -1;

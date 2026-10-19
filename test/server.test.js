@@ -654,3 +654,17 @@ test('opens the @method line of a blueprint field in the model', async () => {
 	assert.deepEqual(await open('tabs/seo', 'metaTitle:'), [model, lineOf('metaTitle()')]);
 	assert.equal(await open('pages/project', 'text:'), null);
 });
+
+test('opens the snippet of a block type defined right in fieldsets', async () => {
+	const uri = pathToFileURL(`${project}/public/site/blueprints/pages/blocks-inline.yml`).href;
+	const text = 'fields:\n  text:\n    type: blocks\n    fieldsets:\n      text:\n        fields:\n          body: true\n      person:\n        fields:\n          name: true\n';
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'yaml', version: 1, text } } });
+
+	assert.deepEqual(await diagnosticsOf(uri), []);
+
+	// An inline definition doesn't use Kirby's blocks/text blueprint, so the snippet opens; person has none
+	const at = (needle) => { const lines = text.slice(0, text.indexOf(needle) + 2).split('\n'); return { line: lines.length - 1, character: lines.at(-1).length }; };
+	const [link] = await request('textDocument/definition', { textDocument: { uri }, position: at('text:\n        fields') }) ?? [];
+	assert.equal(fileURLToPath(link.targetUri), `${project}/public/site/snippets/blocks/text.php`);
+	assert.equal(await request('textDocument/definition', { textDocument: { uri }, position: at('person:') }), null);
+});

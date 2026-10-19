@@ -744,6 +744,7 @@ export function fieldDefinitions(text, find) {
  * @property {string} blueprint the blueprint it refers to, e.g. `blocks/heading`
  * @property {number} start
  * @property {number} end
+ * @property {boolean} [inline] defined right there (`person: { fields: … }`), so it needs no blueprint
  */
 
 /**
@@ -756,10 +757,10 @@ export function fieldsetReferences(text) {
 	const document = parseDocument(text, { uniqueKeys: false, logLevel: 'silent' });
 	const references = [];
 
-	const add = (node, blueprint) => {
+	const add = (node, blueprint, inline = false) => {
 		if (isScalar(node) === true && typeof node.value === 'string' && node.value !== '' && node.range !== undefined) {
 			const start = node.range[0] + (node.type === 'QUOTE_DOUBLE' || node.type === 'QUOTE_SINGLE' ? 1 : 0);
-			references.push({ name: node.value, blueprint: blueprint(node.value), start, end: start + node.value.length });
+			references.push({ name: node.value, blueprint: blueprint(node.value), start, end: start + node.value.length, ...(inline ? { inline } : {}) });
 		}
 	};
 
@@ -779,6 +780,8 @@ export function fieldsetReferences(text) {
 					add(item.key, (name) => 'blocks/' + name);
 				} else if (isScalar(item.value) === true && typeof item.value.value === 'string') {
 					add(item.value, (name) => name);
+				} else if (isMap(item.value) === true && item.value.get('type') !== 'group' && item.value.has('extends') === false) {
+					add(item.key, (name) => 'blocks/' + name, true);
 				}
 			}
 		},

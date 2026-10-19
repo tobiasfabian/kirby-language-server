@@ -259,7 +259,8 @@ test('finds references to fields defined at the top', () => {
 test('finds the block types of fieldsets', () => {
 	const text = 'fieldsets:\n  - heading\nlayout:\n  fieldsets:\n    text: true\n    quote: blocks/quote\n    hidden: false\n    main:\n      type: group\n      fieldsets: [image]\n    custom:\n      fields: {}';
 
-	assert.deepEqual(fieldsetReferences(text).map(({ name, blueprint }) => [name, blueprint]), [['heading', 'blocks/heading'], ['text', 'blocks/text'], ['blocks/quote', 'blocks/quote'], ['image', 'blocks/image']]);
+	// custom is defined right there: no blueprint needed
+	assert.deepEqual(fieldsetReferences(text).map(({ name, blueprint, inline }) => [name, blueprint, inline === true]), [['heading', 'blocks/heading', false], ['text', 'blocks/text', false], ['blocks/quote', 'blocks/quote', false], ['custom', 'blocks/custom', true], ['image', 'blocks/image', false]]);
 });
 
 test('detects list items of fields and fieldsets', () => {
