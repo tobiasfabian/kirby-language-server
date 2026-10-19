@@ -831,3 +831,28 @@ export function fieldKeyOffset(text, name) {
 
 	return found;
 }
+
+/**
+ * The name of a field whose key is at the cursor, in a map of `fields`
+ * @param {string} text
+ * @param {number} offset
+ * @returns {{ name: string, start: number, end: number } | null}
+ */
+export function fieldKeyAt(text, offset) {
+	const document = parseDocument(text, { uniqueKeys: false, logLevel: 'silent' });
+	let found = null;
+
+	visit(document, {
+		Pair(_, pair, path) {
+			const parent = path.at(-2);
+			const range = isScalar(pair.key) === true ? pair.key.range : undefined;
+
+			if (range !== undefined && offset >= range[0] && offset <= range[1] && isPair(parent) === true && isScalar(parent.key) === true && parent.key.value === 'fields' && isContainerMap(path) === true) {
+				found = { name: String(pair.key.value), start: range[0], end: range[1] };
+				return visit.BREAK;
+			}
+		},
+	});
+
+	return found;
+}

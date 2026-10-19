@@ -608,12 +608,12 @@ test('hints at @method lines of a model that are missing or stale, with quick fi
 
 	assert.deepEqual(await diagnosticsOf(uri), [
 		'Field “oldField” isn’t in blueprint pages/project.',
-		'Missing @method for fields of blueprint pages/project: gallery, intro, text, metaTitle, metaDescription',
+		'Missing @method for fields of blueprint pages/project: gallery, intro, text, metaDescription',
 	]);
 
 	const [add] = await request('textDocument/codeAction', { textDocument: { uri }, range: { start: { line: classLine, character: 0 }, end: { line: classLine, character: 0 } }, context: { diagnostics: [] } });
-	assert.equal(add.title, 'Add @method lines for 5 fields');
-	assert.deepEqual(add.edit.changes[uri], [{ range: { start: { line: staleLine + 1, character: 0 }, end: { line: staleLine + 1, character: 0 } }, newText: ['gallery', 'intro', 'text', 'metaTitle', 'metaDescription'].map((name) => ` * @method \\Kirby\\Content\\Field ${name}()\n`).join('') }]);
+	assert.equal(add.title, 'Add @method lines for 4 fields');
+	assert.deepEqual(add.edit.changes[uri], [{ range: { start: { line: staleLine + 1, character: 0 }, end: { line: staleLine + 1, character: 0 } }, newText: ['gallery', 'intro', 'text', 'metaDescription'].map((name) => ` * @method \\Kirby\\Content\\Field ${name}()\n`).join('') }]);
 
 	const [remove] = await request('textDocument/codeAction', { textDocument: { uri }, range: { start: { line: staleLine, character: 3 }, end: { line: staleLine, character: 3 } }, context: { diagnostics: [] } });
 	assert.deepEqual([remove.title, remove.edit.changes[uri][0].range], ['Remove @method line for “oldField”', { start: { line: staleLine, character: 0 }, end: { line: staleLine + 1, character: 0 } }]);
@@ -639,4 +639,18 @@ test('adds the missing @var lines of a template', async () => {
 	// A template without PHP at the top gets a PHP block
 	const [, block] = await fix('templates/default.php', '<h1><?= $page->title() ?></h1>');
 	assert.equal(block.newText, '<?php\n/**\n * @var \\Kirby\\Cms\\Page $page\n */\n?>\n');
+});
+
+test('opens the @method line of a blueprint field in the model', async () => {
+	const model = `${project}/public/site/models/project.php`;
+	const lineOf = (needle) => fs.readFileSync(model, 'utf8').split('\n').findIndex((line) => line.includes(needle));
+	const open = async (name, needle) => {
+		const { uri, position } = openBlueprint(name);
+		const [link] = await request('textDocument/definition', { textDocument: { uri }, position: position(needle, 2) }) ?? [];
+		return link === undefined ? null : [fileURLToPath(link.targetUri), link.targetSelectionRange.start.line];
+	};
+
+	assert.deepEqual(await open('pages/project', 'cover:'), [model, lineOf('cover()')]);
+	assert.deepEqual(await open('tabs/seo', 'metaTitle:'), [model, lineOf('metaTitle()')]);
+	assert.equal(await open('pages/project', 'text:'), null);
 });

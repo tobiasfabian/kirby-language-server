@@ -13,7 +13,7 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldKeyOffset, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
+import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldKeyAt, fieldKeyOffset, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
 import { completionContext, fieldContext, fieldMethodContext, findCalls, memberAt, nameAt, propsContext, variableAt, variableContext } from './calls.js';
 import { classInfo, classMethods, closureInfo, collectionSignature, controllerVariables, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listControllers, listDocroot, listMethods, listModels, listSnippets, listStubs, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
 import { isInPhp, phpOnly, undefinedVariables } from './variables.js';
@@ -1294,6 +1294,47 @@ function memberEntry(document, member, site) {
 }
 
 /**
+ * Where the model of a page documents a field of its blueprint: its `@method` line, or a
+ * method of the same name (which wins over the field). For a partial (`tabs/seo`), the models
+ * of the page blueprints that extend it.
+ * @param {TextDocument} document the blueprint
+ * @param {string} field
+ * @param {string} site
+ * @returns {import('./project.js').Entry | undefined}
+ */
+function modelDocEntry(document, field, site) {
+	const own = ownName(document, site);
+	const blueprints = entriesOf(site, 'blueprint');
+	const models = cached('models:' + site, () => listModels(site));
+
+	// The page blueprints this one is, or that use it
+	const pages = own?.startsWith('pages/') ? [own] : [...blueprints].filter(([name, entry]) => {
+		if (name.startsWith('pages/') === false || entry.inline === true) {
+			return false;
+		}
+
+		try {
+			return blueprintReferences(fs.readFileSync(entry.file, 'utf8')).some((reference) => reference.name === own);
+		} catch {
+			return false;
+		}
+	}).map(([name]) => name);
+
+	for (const page of pages) {
+		const model = models.get(page.slice('pages/'.length));
+		const info = model === undefined ? null : classInfo(model.file, model.className);
+		const same = ({ name }) => name.toLowerCase() === field.toLowerCase();
+		const line = info?.documented.find(same)?.line ?? info?.methods.find(same)?.line;
+
+		if (line !== undefined) {
+			return { file: model.file, line, source: 'site' };
+		}
+	}
+
+	return undefined;
+}
+
+/**
  * The site and the name at a position, with what it refers to
  * @param {{ uri: string }} textDocument
  * @param {{ line: number, character: number }} position
@@ -1322,6 +1363,11 @@ function lookup(textDocument, position) {
 	} else if (slot?.name) {
 		name = { kind: 'template', ...slot };
 		entry = templateEntry(templatesOf(site, slot.folder).get(slot.name));
+	} else if (blueprint === true && name === null) {
+		// A field's key: its @method line in the page's model
+		const key = fieldKeyAt(document.getText(), offset);
+		entry = key === null ? undefined : modelDocEntry(document, key.name, site);
+		name = entry === undefined ? null : { kind: 'field', ...key };
 	} else if (name !== null) {
 		entry = name.kind === 'asset' ? assetEntry(site, name.name) : entriesOf(site, name.kind).get(name.name);
 	} else if (site !== null) {
