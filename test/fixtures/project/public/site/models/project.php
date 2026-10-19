@@ -2,6 +2,11 @@
 
 use Kirby\Cms\Page;
 
+/**
+ * @method \Kirby\Content\Field cover()
+ * @method \Kirby\Content\Field title()
+ * @method \Kirby\Content\Field oldField()
+ */
 class ProjectPage extends Page
 {
 	/**

@@ -76,9 +76,10 @@ export function findSites(root, depth = 3) {
  * Lists the PHP files (or others) below a folder, named by their path without the extension
  * @param {string} folder
  * @param {string} extension
+ * @param {Set<string>} [skip] folders not to look into
  * @returns {{ name: string, file: string }[]}
  */
-function phpFiles(folder, extension = '.php') {
+function phpFiles(folder, extension = '.php', skip = new Set()) {
 	const files = [];
 
 	/** @param {string} current */
@@ -95,7 +96,9 @@ function phpFiles(folder, extension = '.php') {
 			const file = path.join(current, entry.name);
 
 			if (entry.isDirectory() === true) {
-				walk(file);
+				if (skip.has(entry.name) === false) {
+					walk(file);
+				}
 			} else if (entry.name.endsWith(extension) === true) {
 				const name = path.relative(folder, file).slice(0, -extension.length).split(path.sep).join('/');
 				files.push({ name, file });
@@ -860,11 +863,10 @@ export function listMethods(site, kind) {
  * The public methods a class defines itself (not the inherited ones, and no magic methods)
  * @param {string} file
  * @param {string} [className] the class to read, if the file has more than one
+ * @param {string | null} [code] the file's code, if it's already read (e.g. not saved yet)
  * @returns {Method[]}
  */
-export function classMethods(file, className) {
-	const code = read(file);
-
+export function classMethods(file, className, code = read(file)) {
 	if (code === null) {
 		return [];
 	}
@@ -914,7 +916,7 @@ export function listModels(site) {
 	}
 
 	for (const { name, file } of phpFiles(path.join(site, 'models'))) {
-		models.set(name, { file });
+		models.set(name, { file, className: (read(file) ?? '').match(/\bclass\s+(\w+)/)?.[1] });
 	}
 
 	return models;
@@ -1067,4 +1069,70 @@ export function controllerVariables(entry) {
 	}
 
 	return { variables, complete };
+}
+
+/**
+ * @typedef {object} DocumentedMethod a `@method` line of a docblock
+ * @property {string} name
+ * @property {string} returns the type before the name, e.g. `\Kirby\Content\Field`
+ * @property {number} line 0-based
+ */
+
+/**
+ * Reads a class: its name, the class it extends, its docblock (where it is, and its
+ * `@method` lines) and the public methods it defines itself
+ * @param {string} file
+ * @param {string} [className] the class to read, if the file has more than one
+ * @param {string | null} [code] the file's code, if it's already read (e.g. not saved yet)
+ * @returns {{ name: string, line: number, extends?: string, docblock: { start: number, end: number } | null, documented: DocumentedMethod[], methods: Method[] } | null}
+ */
+export function classInfo(file, className, code = read(file)) {
+	const declaration = code === null ? null : new RegExp(`\\bclass\\s+(${className ?? '\\w+'})\\b(?:\\s+extends\\s+([\\w\\\\]+))?`).exec(code);
+
+	if (declaration === null) {
+		return null;
+	}
+
+	// The docblock right above the class, if there is one
+	const before = code.slice(0, declaration.index).replace(/\s*(?:(?:final|abstract|readonly)\s+)*$/, '');
+	const docblock = before.endsWith('*/') ? { start: before.lastIndexOf('/**'), end: before.length } : null;
+	const documented = [];
+
+	if (docblock !== null) {
+		for (const match of code.slice(docblock.start, docblock.end).matchAll(/@method\s+(?:static\s+)?([^\s(]+)\s+(\w+)\s*\(/g)) {
+			documented.push({ name: match[2], returns: match[1], line: lineAt(code, docblock.start + match.index) });
+		}
+	}
+
+	return {
+		name: declaration[1],
+		line: lineAt(code, declaration.index),
+		extends: declaration[2]?.split('\\').pop(),
+		docblock,
+		documented,
+		methods: classMethods(file, declaration[1], code),
+	};
+}
+
+/**
+ * The `@method` lines of the stub files of a site (`*.stub.php` outside `kirby/`), by the
+ * class they're for (`Site`, `Page`, `Field` …): what PHP's language server knows about
+ * the methods plugins add
+ * @param {string} site
+ * @returns {Map<string, Set<string>>}
+ */
+export function listStubs(site) {
+	const stubs = new Map();
+
+	for (const { file } of phpFiles(site, '.stub.php', new Set(['.git', 'node_modules', 'vendor', 'kirby', 'cache', 'sessions', 'accounts', 'logs']))) {
+		const code = read(file) ?? '';
+
+		for (const match of code.matchAll(/\/\*\*((?:(?!\*\/)[\s\S])*)\*\/\s*(?:(?:final|abstract)\s+)?class\s+(\w+)/g)) {
+			const names = stubs.get(match[2]) ?? new Set();
+			[...match[1].matchAll(/@method\s+(?:static\s+)?[^\s(]+\s+(\w+)\s*\(/g)].forEach(([, name]) => names.add(name.toLowerCase()));
+			stubs.set(match[2], names);
+		}
+	}
+
+	return stubs;
 }

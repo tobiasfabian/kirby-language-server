@@ -576,3 +576,44 @@ test('offers and checks nothing in the HTML of a template', async () => {
 	assert.equal(await request('textDocument/hover', { textDocument: { uri }, position: position('$site->x', 2) }), null);
 	assert.deepEqual(await diagnosticsOf(uri), []);
 });
+
+test('leaves to PHP’s language server what types and docblocks tell it', async () => {
+	const text = '<?php\n/** @var ProjectPage $page */\n/** @var \\Kirby\\Cms\\Site $site */\n?>\n<?= $page-> ?> <?= $site-> ?> <?= $page->cover()-> ?> <?= $page->gallery()-> ?>';
+	const { uri, position } = openPhp('templates/project.php', text);
+	const labels = async (needle, shift) => (await request('textDocument/completion', { textDocument: { uri }, position: position(needle, shift) })).map((item) => item.label);
+
+	// cover is documented with @method, year is the model's own method; gallery isn't documented
+	const page = await labels('$page-> ', 7);
+	assert.ok(page.includes('gallery') && page.includes('contactForm'));
+	assert.equal(page.includes('cover') || page.includes('year'), false);
+
+	// contactPage is in a stub
+	assert.deepEqual(await labels('$site-> ', 7), ['footer']);
+
+	// cover() is a Field PHP knows, toPhone is in a stub: nothing left
+	assert.deepEqual(await labels('cover()-> ', 9), []);
+	assert.ok((await labels('gallery()-> ', 11)).includes('toFile'));
+});
+
+test('hints at @method lines of a model that are missing or stale, with quick fixes', async () => {
+	const file = `${project}/public/site/models/project.php`;
+	const uri = pathToFileURL(file).href;
+	const text = fs.readFileSync(file, 'utf8');
+	const lines = text.split('\n');
+	const classLine = lines.findIndex((line) => line.startsWith('class ProjectPage'));
+	const staleLine = lines.findIndex((line) => line.includes('oldField'));
+
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'php', version: 1, text } } });
+
+	assert.deepEqual(await diagnosticsOf(uri), [
+		'pages/project has no field “oldField”, so PHP’s language server offers a field that doesn’t exist.',
+		'ProjectPage documents fields with @method, but not these of pages/project: gallery, intro, text, metaTitle, metaDescription. PHP’s language server doesn’t know them.',
+	]);
+
+	const [add] = await request('textDocument/codeAction', { textDocument: { uri }, range: { start: { line: classLine, character: 0 }, end: { line: classLine, character: 0 } }, context: { diagnostics: [] } });
+	assert.equal(add.title, 'Add @method lines for 5 fields');
+	assert.deepEqual(add.edit.changes[uri], [{ range: { start: { line: staleLine + 1, character: 0 }, end: { line: staleLine + 1, character: 0 } }, newText: ['gallery', 'intro', 'text', 'metaTitle', 'metaDescription'].map((name) => ` * @method \\Kirby\\Content\\Field ${name}()\n`).join('') }]);
+
+	const [remove] = await request('textDocument/codeAction', { textDocument: { uri }, range: { start: { line: staleLine, character: 3 }, end: { line: staleLine, character: 3 } }, context: { diagnostics: [] } });
+	assert.deepEqual([remove.title, remove.edit.changes[uri][0].range], ['Remove @method line for “oldField”', { start: { line: staleLine, character: 0 }, end: { line: staleLine + 1, character: 0 } }]);
+});

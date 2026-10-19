@@ -26,6 +26,9 @@ In blueprints:
 
 For all of them:
 
+- Only the PHP code of a file counts, not the HTML, CSS or JavaScript around it.
+- PHP's language server (Intelephense) comes first: if a file tells it the class of `$page` (`/** @var ProjectPage $page */`, or a typed parameter in a controller), fields documented with `@method` in the model, the model's own methods, methods in `*.stub.php` files and, after a documented field, Kirby's field methods are left to it. In a model that documents its fields with `@method`, a hint lists the fields of the blueprint that have no line yet, and a warning marks lines for fields that don't exist, each with a quick fix.
+
 - **Open Referenced File** (⌃⌥⌘O, or from the command palette) opens the file the name under the cursor refers to: the snippet, collection, file, blueprint or template, for translation keys the line in the language file. On `$page->name()` it opens the method (in the plugin, the config or the model) or the field's line in the blueprint; on `$page->cover()->toFile()` the field method, Kirby's own in Kirby's source.
 - **Warnings** mark names that don't exist.
 	- `t('key', 'Fallback')` with a fallback text isn't flagged. If a plugin loads its translations at runtime (e.g. from JSON files), missing keys are only a hint, because they might come from there.
