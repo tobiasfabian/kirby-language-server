@@ -195,7 +195,7 @@ test('jumps to the translation in the default language', async () => {
 test('warns about missing snippets, collections and translations', async () => {
 	const messages = await diagnosticsOf(templateUri);
 
-	assert.equal(messages.length, 8);
+	assert.equal(messages.length, 10);
 	assert.match(messages[0], /Snippet “head” not found/);
 	assert.match(messages[1], /Snippet “m-nav-footer” not found/);
 	assert.match(messages[2], /Collection “missing” not found/);
@@ -203,7 +203,7 @@ test('warns about missing snippets, collections and translations', async () => {
 	assert.match(messages[4], /Translation “missing.plural” not found/);
 	assert.match(messages[5], /File “assets\/images\/missing.svg” not found/);
 	assert.match(messages[6], /Template “missing-template” not found: no blueprint pages\/missing-template or files\/missing-template, no template missing-template.php and no page that uses it/);
-	assert.equal(messages[7], 'Variable “$block” is not defined: the template doesn’t set it and its controller doesn’t return it.');
+	assert.deepEqual(messages.slice(7), ['$page has no @var line, so PHP’s language server reports it as undefined. Kirby provides it.', '$kirby has no @var line, so PHP’s language server reports it as undefined. Kirby provides it.', '$site has no @var line, so PHP’s language server reports it as undefined. Kirby provides it.']);
 });
 
 test('checks collections in blueprint queries', async () => {
@@ -495,7 +495,8 @@ test('completes, checks and opens the variables of a template’s controllers', 
 	assert.equal(items.find((item) => item.label === '$cover').detail, '$page->cover()->toFile()');
 	assert.equal(items[0].textEdit.range.start.character, 4);
 
-	assert.deepEqual(await diagnosticsOf(uri), ['$missing', '$c'].map((name) => `Variable “${name}” is not defined: the template doesn’t set it and its controller doesn’t return it.`));
+	// $missing and $c are left to PHP's language server; $navigation and $cover need an @var line for it
+	assert.deepEqual(await diagnosticsOf(uri), ['navigation', 'cover'].map((name) => `$${name} has no @var line, so PHP’s language server reports it as undefined. The controller provides it.`));
 
 	const [link] = await request('textDocument/definition', { textDocument: { uri }, position: position('$cover', 2) });
 	assert.equal(fileURLToPath(link.targetUri), `${project}/public/site/controllers/project.php`);
@@ -505,11 +506,11 @@ test('completes, checks and opens the variables of a template’s controllers', 
 	assert.match(hover.contents.value, /\*\*\$navigation\*\* · site\/controllers\/site.php/);
 });
 
-test('doesn’t warn about variables of snippets or of controllers it can’t read', async () => {
+test('doesn’t hint at variables of snippets or of templates it can’t follow', async () => {
 	const snippet = openPhp('snippets/m-teaser.php', '<?= $title ?>');
 	assert.deepEqual(await diagnosticsOf(snippet.uri), []);
 
-	const template = openPhp('templates/default.php', '<?php extract($data) ?><?= $title ?>');
+	const template = openPhp('templates/extract.php', '<?php extract($data) ?><?= $page->title() ?>');
 	assert.deepEqual(await diagnosticsOf(template.uri), []);
 });
 
@@ -574,7 +575,7 @@ test('offers and checks nothing in the HTML of a template', async () => {
 	assert.deepEqual(await request('textDocument/completion', { textDocument: { uri }, position: position("snippet('", 9) }), []);
 	assert.ok((await request('textDocument/completion', { textDocument: { uri }, position: position('<?= $page->', 11) })).some((item) => item.label === 'cover'));
 	assert.equal(await request('textDocument/hover', { textDocument: { uri }, position: position('$site->x', 2) }), null);
-	assert.deepEqual(await diagnosticsOf(uri), []);
+	assert.deepEqual(await diagnosticsOf(uri), ['$page has no @var line, so PHP’s language server reports it as undefined. Kirby provides it.']);
 });
 
 test('leaves to PHP’s language server what types and docblocks tell it', async () => {
@@ -616,4 +617,26 @@ test('hints at @method lines of a model that are missing or stale, with quick fi
 
 	const [remove] = await request('textDocument/codeAction', { textDocument: { uri }, range: { start: { line: staleLine, character: 3 }, end: { line: staleLine, character: 3 } }, context: { diagnostics: [] } });
 	assert.deepEqual([remove.title, remove.edit.changes[uri][0].range], ['Remove @method line for “oldField”', { start: { line: staleLine, character: 0 }, end: { line: staleLine + 1, character: 0 } }]);
+});
+
+test('adds the missing @var lines of a template', async () => {
+	const fix = async (file, text, at = '$page') => {
+		const { uri, position } = openPhp(file, text);
+		await diagnosticsOf(uri);
+		const [action] = await request('textDocument/codeAction', { textDocument: { uri }, range: { start: position(at, 0), end: position(at, 0) }, context: { diagnostics: [] } });
+		return action === undefined ? null : [action.title, action.edit.changes[uri][0]];
+	};
+
+	// A new docblock after <?php, with the model's class, Kirby's and the controller's
+	const [title, edit] = await fix('templates/project.php', '<?php $x = 1 ?>\n<?= $page->title() . $site->title() . $cover . $missing ?>');
+	assert.equal(title, 'Add @var lines for 3 variables');
+	assert.equal(edit.newText, '\n\n/**\n * @var ProjectPage $page\n * @var \\Kirby\\Cms\\Site $site\n * @var mixed $cover\n */\n');
+
+	// Into the docblock that has @var lines already
+	const [, into] = await fix('templates/project.php', '<?php\n\n/**\n * @var ProjectPage $page\n */\n\n?>\n<?= $page->title() . $cover ?>', '$cover');
+	assert.deepEqual(into, { range: { start: { line: 4, character: 0 }, end: { line: 4, character: 0 } }, newText: ' * @var mixed $cover\n' });
+
+	// A template without PHP at the top gets a PHP block
+	const [, block] = await fix('templates/default.php', '<h1><?= $page->title() ?></h1>');
+	assert.equal(block.newText, '<?php\n/**\n * @var \\Kirby\\Cms\\Page $page\n */\n?>\n');
 });

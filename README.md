@@ -35,7 +35,7 @@ For all of them:
 	- A page template exists if there's a blueprint, a template file (also from a plugin) or a page in the content folder that uses it. A file template without a blueprint is only a hint: Kirby falls back to `files/default`.
 	- `intro: textarea` is flagged: Kirby reads it as `extends`, not as the type. If a plugin registers blueprints in a way that can't be read, missing blueprints and templates are only a hint.
 	- A field reference in `fields: [intro]` must be defined at the top (checked in the blueprints of pages, files, users and the site; a partial gets them from the blueprint that uses it). A block type in `fieldsets` needs a `blocks/*` blueprint.
-	- A variable in a template must come from the template itself, its controllers or Kirby. This is only checked when every controller could be read completely (not with `return $data;` or `...$spread`) and the template doesn't use `extract()`, `$$name` or `include`.
+	- **`@var` lines in templates**: PHP's language server reports `$page`, `$site` and the controller's variables as undefined unless the template documents them with `@var`. A hint on their first use says so, and a quick fix adds the lines to the docblock at the top (or a new one): `$page` with the page's model class, Kirby's classes for the others, and for controller variables the type where it's sure (`new …`, an `@var` line in the controller, a model method's return type), else `mixed`. Undefined variables themselves are left to PHP's language server.
 - **Jump to Definition** to the file (or the line of a collection defined as a closure, or of a translation key). After `->` to the method (the closure in a plugin or the config, the method in the model, Kirby's own field method in its source) or to the field's key in the blueprint, also when it's defined in a tab or partial the blueprint extends
 - **Hover** with the same information as the completion
 - **Code lenses** with each snippet's or collection's origin above its line (not shown in Nova)
@@ -72,7 +72,7 @@ src/
 ├── php.js        reads what plugins and the config register
 ├── project.js    reads snippets, collections, translations, blueprints, templates, controllers, methods, models and the docroot
 ├── server.js     the language server
-└── variables.js  variables a template uses but doesn't define
+└── variables.js  the PHP code of a file, and variables a template uses but doesn't define
 scripts/
 └── read-kirby.mjs writes the field options and methods from Kirby's source
 Kirby.novaextension/

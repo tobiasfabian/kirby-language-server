@@ -642,23 +642,140 @@ function variableCompletion(document, position, site) {
 }
 
 /**
- * Warnings for variables a template uses that neither it nor its controllers define.
- * Only if every controller could be read and the template doesn't define variables in ways that can't be followed.
+ * The type of a variable a controller returns, where it can be read for sure:
+ * `new Foo()`, a variable of `compact()` with an `@var` line or `new` in the controller,
+ * or `$page->method()` of the page's model with a return type. Otherwise `mixed`.
+ * @param {TemplateVariable} variable
+ * @param {import('./project.js').Method[]} modelMethods
+ */
+function variableType(variable, modelMethods) {
+	const value = variable.value.trim();
+	const created = value.match(/^new\s+(\\?[\w\\]+)/);
+
+	if (created !== null) {
+		return created[1];
+	}
+
+	const compacted = value.match(/^\$(\w+)$/);
+	let code = '';
+
+	try {
+		code = compacted === null ? '' : fs.readFileSync(variable.entry.file, 'utf8');
+	} catch {
+		// the controller can't be read
+	}
+
+	const documented = compacted === null ? null : code.match(new RegExp(`@var\\s+([^\\s$]+)\\s+\\$${compacted[1]}\\b`)) ?? code.match(new RegExp(`\\$${compacted[1]}\\s*=\\s*new\\s+(\\\\?[\\w\\\\]+)`));
+
+	if (documented !== null) {
+		return documented[1];
+	}
+
+	const method = value.match(/^\$page->(\w+)\(\)$/);
+	return modelMethods.find(({ name }) => name === method?.[1])?.returns ?? 'mixed';
+}
+
+/**
+ * The variables a template in `site/templates` uses that come from Kirby or its controllers
+ * but have no `@var` line, so PHP's language server reports them as undefined: each with its
+ * first use and the type for its line (the page's model, Kirby's classes, see `variableType`)
+ * @param {TextDocument} document
+ * @param {string} site
+ * @returns {{ name: string, type: string, start: number, end: number }[]}
+ */
+function missingVarDocs(document, site) {
+	const file = fileURLToPath(document.uri);
+	const data = templateVariables(file, site);
+	const used = data === null ? null : undefinedVariables(document.getText());
+
+	if (used === null) {
+		return [];
+	}
+
+	const declared = new Set([...document.getText().matchAll(/@var\s+[^\s$]+\s+\$(\w+)/g)].map(([, name]) => name));
+	const template = path.basename(file).split('.')[0];
+	const model = cached('models:' + site, () => listModels(site)).get(template);
+	const modelMethods = model === undefined ? [] : cached(`model:${model.file}`, () => classMethods(model.file, model.className));
+	const missing = new Map();
+
+	for (const { name, start, end } of used) {
+		if (missing.has(name) === true || declared.has(name) === true) {
+			continue;
+		}
+
+		if (data.variables.has(name) === true) {
+			missing.set(name, { name, type: variableType(data.variables.get(name), modelMethods), start, end });
+		} else if (TEMPLATE_DATA[name] !== undefined) {
+			missing.set(name, { name, type: name === 'page' && model?.className ? model.className : '\\' + TEMPLATE_DATA[name], start, end });
+		}
+	}
+
+	return [...missing.values()];
+}
+
+/**
+ * Hints for variables of a template without `@var` line (see `missingVarDocs`), on their first use
  * @param {TextDocument} document
  * @param {string} site
  */
-function variableDiagnostics(document, site) {
-	const data = templateVariables(fileURLToPath(document.uri), site);
-	const used = data?.complete === true ? undefinedVariables(document.getText()) : null;
+function varDocDiagnostics(document, site) {
+	return missingVarDocs(document, site).map(({ name, start, end }) => ({
+		severity: DiagnosticSeverity.Information,
+		range: { start: document.positionAt(start), end: document.positionAt(end) },
+		message: `$${name} has no @var line, so PHP’s language server reports it as undefined. ${TEMPLATE_DATA[name] === undefined ? 'The controller' : 'Kirby'} provides it.`,
+		source: 'Kirby',
+		code: 'missing-var-doc',
+	}));
+}
 
-	return (used ?? [])
-		.filter(({ name }) => data.variables.has(name) === false && TEMPLATE_DATA[name] === undefined)
-		.map(({ name, start, end }) => ({
-			severity: DiagnosticSeverity.Warning,
-			range: { start: document.positionAt(start), end: document.positionAt(end) },
-			message: `Variable “$${name}” is not defined: the template doesn’t set it and its controller doesn’t return it.`,
-			source: 'Kirby',
-		}));
+/**
+ * The quick fix for `varDocDiagnostics`: adds the missing `@var` lines to the docblock at the
+ * top of the template (before its `*\/`), or a new docblock after `<?php` (or in a new PHP block)
+ * @param {TextDocument} document
+ * @param {string} site
+ * @param {{ start: { line: number }, end: { line: number } }} range
+ * @param {any[]} diagnostics those the editor sends along
+ */
+function varDocCodeActions(document, site, range, diagnostics) {
+	const missing = missingVarDocs(document, site);
+	const touched = missing.some(({ start }) => {
+		const line = document.positionAt(start).line;
+		return line >= range.start.line && line <= range.end.line;
+	});
+
+	if (missing.length === 0 || touched === false) {
+		return [];
+	}
+
+	const text = document.getText();
+	const lines = missing.map(({ name, type }) => `@var ${type} $${name}`);
+	const docblock = text.match(/\/\*\*(?:(?!\*\/)[\s\S])*@var(?:(?!\*\/)[\s\S])*\*\//);
+	let edit;
+
+	if (docblock !== null && docblock[0].includes('\n') === true) {
+		// Before the closing line of a docblock with @var lines, written like them
+		const close = document.positionAt(docblock.index + docblock[0].lastIndexOf('*/')).line;
+		const prefix = docblock[0].match(/\n(\s*\*\s*)@var/)?.[1] ?? ' * ';
+		edit = { range: { start: { line: close, character: 0 }, end: { line: close, character: 0 } }, newText: lines.map((line) => prefix + line + '\n').join('') };
+	} else if (docblock !== null) {
+		// After a one-line docblock, as one-line docblocks
+		const end = document.positionAt(docblock.index + docblock[0].length);
+		edit = { range: { start: end, end }, newText: lines.map((line) => `\n/** ${line} */`).join('') };
+	} else if (text.startsWith('<?php') === true) {
+		const end = document.positionAt(5);
+		edit = { range: { start: end, end }, newText: '\n\n/**\n' + lines.map((line) => ` * ${line}\n`).join('') + ' */\n' };
+	} else {
+		const start = { line: 0, character: 0 };
+		edit = { range: { start, end: start }, newText: '<?php\n/**\n' + lines.map((line) => ` * ${line}\n`).join('') + ' */\n?>\n' };
+	}
+
+	return [{
+		title: missing.length === 1 ? `Add @var line for $${missing[0].name}` : `Add @var lines for ${missing.length} variables`,
+		kind: CodeActionKind.QuickFix,
+		isPreferred: true,
+		diagnostics: diagnostics.filter((diagnostic) => diagnostic.code === 'missing-var-doc'),
+		edit: { changes: { [document.uri]: [edit] } },
+	}];
 }
 
 /**
@@ -1380,7 +1497,7 @@ function validate(document) {
 		});
 	}
 
-	diagnostics.push(...variableDiagnostics(document, site), ...modelDiagnostics(document, site));
+	diagnostics.push(...varDocDiagnostics(document, site), ...modelDiagnostics(document, site));
 
 	if (isBlueprint(document) === true) {
 		diagnostics.push(...blueprintDiagnostics(document, site), ...referenceDiagnostics(document, site));
@@ -1553,7 +1670,7 @@ connection.onCodeAction(({ textDocument, range, context }) => {
 	const document = documents.get(textDocument.uri);
 	const site = document ? siteFor(document.uri) : null;
 
-	return site === null ? [] : modelCodeActions(document, site, range, context.diagnostics);
+	return site === null ? [] : [...modelCodeActions(document, site, range, context.diagnostics), ...varDocCodeActions(document, site, range, context.diagnostics)];
 });
 
 connection.onCodeLens(({ textDocument }) => {

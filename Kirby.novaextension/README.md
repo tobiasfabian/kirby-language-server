@@ -35,7 +35,7 @@ For all of them:
 	- `intro: textarea` is marked too, because Kirby reads it as `extends` and not as the type.
 	- A template exists if there's a blueprint, a template file or a page that uses it. For file templates without a blueprint it's only a hint, because Kirby falls back to `files/default`.
 	- Field references that aren't defined at the top of the blueprint, and block types in `fieldsets` without a blueprint.
-	- Variables in a template that neither the template, its controllers nor Kirby define. Only when every controller could be read and the template doesn't use `extract()` or `include`.
+	- In a template, `$page`, `$site` and controller variables without an `@var` line get a hint, because Intelephense reports them as undefined. A quick fix adds the lines with their types (the page's model, Kirby's classes, the controller's types where they're sure).
 
 Fallbacks such as `snippet(['m-card-project', 'm-card'])` are understood. Names built at runtime, like `snippet('blocks/' . $block->type())`, are not checked.
 
