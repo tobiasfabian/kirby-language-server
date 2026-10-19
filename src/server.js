@@ -15,7 +15,7 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldKeyOffset, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
 import { completionContext, fieldContext, fieldMethodContext, findCalls, memberAt, nameAt, propsContext, variableAt, variableContext } from './calls.js';
 import { classMethods, closureInfo, collectionSignature, controllerVariables, findAsset, findSites, listBlueprints, listCollections, listContentTemplates, listControllers, listDocroot, listMethods, listModels, listSnippets, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
-import { undefinedVariables } from './variables.js';
+import { isInPhp, phpOnly, undefinedVariables } from './variables.js';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -977,8 +977,8 @@ function memberEntry(document, member, site) {
  */
 function lookup(textDocument, position) {
 	const document = documents.get(textDocument.uri);
-	const site = document ? siteFor(document.uri) : null;
 	const offset = document?.offsetAt(position);
+	const site = document !== undefined && isCode(document, offset) === true ? siteFor(document.uri) : null;
 	const blueprint = site !== null && isBlueprint(document) === true;
 	const covers = ({ start, end }) => offset >= start && offset <= end;
 	const fieldset = blueprint ? fieldsetReferences(document.getText()).find(covers) ?? null : null;
@@ -1029,6 +1029,25 @@ function lookup(textDocument, position) {
  */
 function isBlueprint(document) {
 	return /\.ya?ml$/.test(document.uri);
+}
+
+/**
+ * Whether a position is somewhere the server has something to say: in a blueprint
+ * anywhere, in a PHP file only in its PHP code, not in its HTML
+ * @param {TextDocument} document
+ * @param {number} offset
+ */
+function isCode(document, offset) {
+	return isBlueprint(document) === true || isInPhp(document.getText(), offset) === true;
+}
+
+/**
+ * The text to look for calls in: a blueprint as it is, of a PHP file only its PHP code
+ * (the HTML around it blanked out, so offsets stay the same)
+ * @param {TextDocument} document
+ */
+function codeOf(document) {
+	return isBlueprint(document) === true ? document.getText() : phpOnly(document.getText());
 }
 
 /**
@@ -1100,7 +1119,7 @@ function validate(document) {
 
 	const diagnostics = [];
 
-	for (const call of findCalls(document.getText())) {
+	for (const call of findCalls(codeOf(document))) {
 		let severity = DiagnosticSeverity.Warning;
 
 		// Every template of a list must exist
@@ -1207,7 +1226,9 @@ connection.onInitialized(() => {
 
 connection.onCompletion(({ textDocument, position }) => {
 	const document = documents.get(textDocument.uri);
-	const site = document ? siteFor(document.uri) : null;
+
+	// Nothing to offer in the HTML of a template
+	const site = document !== undefined && isCode(document, document.offsetAt(position)) === true ? siteFor(document.uri) : null;
 
 	if (site !== null && isBlueprint(document) === true) {
 		// `create:` of a pagelist takes templates or false
@@ -1329,7 +1350,7 @@ connection.onCodeLens(({ textDocument }) => {
 		return [];
 	}
 
-	return findCalls(document.getText()).filter((call) => call.kind === 'snippet' || call.kind === 'collection').flatMap((call) => {
+	return findCalls(codeOf(document)).filter((call) => call.kind === 'snippet' || call.kind === 'collection').flatMap((call) => {
 		const entries = entriesOf(site, call.kind);
 		const found = call.names.map(({ name }) => entries.get(name)).find((entry) => entry !== undefined);
 

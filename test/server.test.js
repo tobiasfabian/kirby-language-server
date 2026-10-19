@@ -565,3 +565,14 @@ test('opens and describes methods and fields after ->', async () => {
 	const field = await request('textDocument/hover', { textDocument: { uri }, position: position('metatitle', 2) });
 	assert.match(field.contents.value, /^\*\*metaTitle\*\* · text · pages\/project\n\nsite\/blueprints\/tabs\/seo.yml$/);
 });
+
+test('offers and checks nothing in the HTML of a template', async () => {
+	const text = '<p>$page-> snippet(\'</p>\n<script>i18n.t(\'missing.in.js\'); $site->x</script>\n<?= $page-> ?>';
+	const { uri, position } = openPhp('templates/project.php', text);
+
+	assert.deepEqual(await request('textDocument/completion', { textDocument: { uri }, position: position('$page->', 7) }), []);
+	assert.deepEqual(await request('textDocument/completion', { textDocument: { uri }, position: position("snippet('", 9) }), []);
+	assert.ok((await request('textDocument/completion', { textDocument: { uri }, position: position('<?= $page->', 11) })).some((item) => item.label === 'cover'));
+	assert.equal(await request('textDocument/hover', { textDocument: { uri }, position: position('$site->x', 2) }), null);
+	assert.deepEqual(await diagnosticsOf(uri), []);
+});
