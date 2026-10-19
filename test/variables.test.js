@@ -19,6 +19,7 @@ test('finds variables a template uses but doesn’t define', () => {
 	assert.deepEqual(names('<?php try { } catch (Exception $e) { echo $e; } if (preg_match("/a/", $text, $m)) { echo $m[0]; } ?>'), []);
 	assert.deepEqual(names('<?php static $cache; global $config; ?><?= $cache . $config . $_GET["x"] ?>'), []);
 	assert.deepEqual(names('<script>let $x = `${y}`;</script><?php /* $hidden */ ?>'), []);
+	assert.deepEqual(names('<?php $a = 1; snippet(\'x\', compact(\'a\', "clients")) ?>'), ['clients']);
 });
 
 test('gives up where variables can’t be known', () => {

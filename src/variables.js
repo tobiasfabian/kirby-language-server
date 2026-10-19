@@ -126,7 +126,7 @@ export function phpCode(text) {
 
 /**
  * Lists the variables a template uses that it doesn't define itself, each
- * occurrence with its offsets. Null if that can't be known (`extract()`, `$$name`, `include` …).
+ * occurrence with its offsets, also the names in `compact('a', 'b')`. Null if that can't be known (`extract()`, `$$name`, `include` …).
  * @param {string} text
  * @returns {{ name: string, start: number, end: number }[] | null}
  */
@@ -174,7 +174,20 @@ export function undefinedVariables(text) {
 		define(code.slice(code.indexOf(',', open) + 1 || end, end));
 	}
 
-	return [...code.matchAll(VARIABLE)]
-		.filter(([, name]) => defined.has(name) === false && BUILT_IN.has(name) === false)
-		.map((match) => ({ name: match[1], start: match.index, end: match.index + match[0].length }));
+	// compact('a', 'b') uses $a and $b
+	const uses = [...code.matchAll(VARIABLE)].map((match) => ({ name: match[1], start: match.index, end: match.index + match[0].length }));
+	const php = phpOnly(text);
+
+	for (const call of code.matchAll(/\bcompact\s*\(/g)) {
+		const close = php.indexOf(')', call.index);
+
+		for (const name of php.slice(call.index, close === -1 ? php.length : close).matchAll(/(['"])(\w+)\1/g)) {
+			const start = call.index + name.index + 1;
+			uses.push({ name: name[2], start, end: start + name[2].length });
+		}
+	}
+
+	return uses
+		.sort((a, b) => a.start - b.start)
+		.filter(({ name }) => defined.has(name) === false && BUILT_IN.has(name) === false);
 }
