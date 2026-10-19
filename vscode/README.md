@@ -8,7 +8,7 @@ In PHP files:
 	- snippets from `site/snippets`, registered by plugins or in the config, and Kirby's block snippets; each shows the variables it expects (`@var` lines and defaults like `$size ??= null;`)
 	- collections from `site/collections`, registered by plugins or under `'extensions'` in the config; each shows its signature
 	- translation keys from `site/languages`, plugins and the config, then Kirby's own (from `kirby/i18n/translations`); each shows its text in the default language, and in all languages in the details
-- **Snippet variables**: inside `snippet('m-card', ['…`, the keys of the data array are completed with the variables the snippet expects, their type and default.
+- **Snippet variables**: inside `snippet('m-card', ['…`, the keys of the data array are completed with the variables the snippet expects, their type and default. `$page`, `$site`, `$kirby` and `$pages` are left out: every snippet has them anyway.
 - **File paths** in `hashedUrl('`, `asset('`, `svg('`, `css('`, `js('` and `url('assets/`: the files and folders of the docroot (where Kirby's `index.php` is). URLs, `@auto` and files in `media/` (which Kirby creates on demand) aren't checked.
 - **Templates** in `->template('…')`, `->notTemplate('…')`, `->changeTemplate('…')` and `filterBy('template', …)`.
 - **Field names**: after `$page->`, `$site->`, `$block->` and `$this->` (in a model), the fields of the page's, site's or block's blueprint are offered as `name()`, with their type and label. In a template, controller or model it's the blueprint of that template; in a block snippet that block's; in other snippets the fields of all page blueprints.
