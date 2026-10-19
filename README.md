@@ -18,8 +18,8 @@ In PHP files:
 
 In blueprints (`src/blueprints.js`):
 
-- **`type:`**: Kirby 6 field types, with `pages`, `files` and `users` as deprecated aliases
-- **Field options**: at a key of a field, the options of its type (from `type`, what it `extends`, or its name), with type, default and description, without those it already has. They are read from Kirby 6's field classes into `src/field-properties.json`. In the value of a boolean option, `true`, `false` and (if it may be empty) `null`, the default marked; for `theme` of an `info` field its themes (listed in `src/blueprints.js` from the docs).
+- **`type:`**: Kirby 6 field types, with `pages`, `files` and `users` as deprecated aliases; hover links a type to its docs
+- **Field options**: at a key of a field (also at the top of a field partial like `fields/writer.yml`), the options of its type (from `type`, what it `extends`, or its name), with type, default and description, without those it already has. They are read from Kirby 6's field classes into `src/field-properties.json`. In the value of a boolean option, `true`, `false` and (if it may be empty) `null`, the default marked; for `theme` of an `info` field its themes (listed in `src/blueprints.js` from the docs).
 - **`extends:`** and the shorthand `seo: fields/seo` in `fields`, `tabs` and `sections`: the blueprints from `site/blueprints`, plugins, the config and Kirby, those of the fitting folder first
 - **Template names** in `template`, `templates`, `templatesIgnore` and `create` of a `pagelist`, `template` of a `filelist`, `uploads` of a `filepicker` or `textarea`, and `options: changeTemplate`
 - **Field references** (Kirby 6): in a list of `fields` in tabs and columns, the fields defined at the top of the blueprint. Jump to Definition leads to the definition.

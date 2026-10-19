@@ -669,3 +669,24 @@ test('completes the themes of an info field', async () => {
 	assert.deepEqual(items.map((item) => item.label), ['info', 'positive', 'negative', 'notice', 'warning', 'passive', 'text', 'dark', 'code', 'empty', 'none']);
 	assert.equal(items[0].detail, 'default');
 });
+
+test('completes the keys at the top of a field partial', async () => {
+	const uri = pathToFileURL(`${project}/public/site/blueprints/fields/cover.yml`).href;
+	const text = 'label: Cover\ntype: filepicker\nmu\nsearch: ';
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'yaml', version: 2, text } } });
+
+	const keys = (await request('textDocument/completion', { textDocument: { uri }, position: { line: 2, character: 2 } })).map((item) => item.label);
+	assert.ok(keys.includes('multiple') && keys.includes('uploads'));
+	assert.equal(keys.includes('label'), false);
+
+	const values = await request('textDocument/completion', { textDocument: { uri }, position: { line: 3, character: 8 } });
+	assert.deepEqual(values.map((item) => item.label), ['true', 'false', 'null']);
+});
+
+test('links a field type to its docs on hover', async () => {
+	const uri = pathToFileURL(`${project}/public/site/blueprints/fields/cover.yml`).href;
+	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'yaml', version: 3, text: 'type: textarea\n' } } });
+
+	const hover = await request('textDocument/hover', { textDocument: { uri }, position: { line: 0, character: 8 } });
+	assert.equal(hover.contents.value, '**textarea** field · [Kirby docs](https://getkirby.com/docs/reference/panel/fields/textarea)');
+});

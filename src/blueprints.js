@@ -464,9 +464,15 @@ export function fieldProperties(type) {
  * @param {string} text
  * @param {string[]} lines the lines above the cursor
  * @param {number} indent
+ * @param {string | null} [partial] the field's name, if the file is a field partial
  * @returns {FieldAtLine | null}
  */
-function fieldOfLine(text, lines, indent) {
+function fieldOfLine(text, lines, indent, partial = null) {
+	// At the top of a field partial (`fields/writer.yml`), the keys are the field's own
+	if (partial !== null && indent === 0) {
+		return fieldOfKeys(text, lines, partial, -1, 0);
+	}
+
 	// keys: the field, then `fields`
 	const keys = ancestors(lines, lines.length - 1, indent);
 
@@ -474,11 +480,24 @@ function fieldOfLine(text, lines, indent) {
 		return null;
 	}
 
+	return fieldOfKeys(text, lines, keys[0].key, keys[0].line, indent);
+}
+
+/**
+ * The field whose keys follow line `from` with the indentation `indent`
+ * @param {string} text
+ * @param {string[]} lines the lines above the cursor
+ * @param {string} name
+ * @param {number} from the field's line, -1 for the top of a file
+ * @param {number} indent
+ * @returns {FieldAtLine}
+ */
+function fieldOfKeys(text, lines, name, from, indent) {
 	// The field's other keys, above and below the cursor
 	const all = text.split('\n');
 	const own = [];
 
-	for (let i = keys[0].line + 1; i < all.length; i++) {
+	for (let i = from + 1; i < all.length; i++) {
 		const trimmed = all[i].trimStart();
 		const lineIndent = all[i].length - trimmed.length;
 
@@ -486,7 +505,7 @@ function fieldOfLine(text, lines, indent) {
 			continue;
 		}
 
-		if (lineIndent <= keys[0].indent) {
+		if (from !== -1 && lineIndent < indent) {
 			break;
 		}
 
@@ -498,7 +517,7 @@ function fieldOfLine(text, lines, indent) {
 	const value = (key) => own.map((line) => line.match(new RegExp(`^${key}:\\s*["']?([\\w./-]+)`))?.[1]).find((found) => found !== undefined);
 
 	return {
-		name: keys[0].key,
+		name,
 		type: value('type'),
 		extends: value('extends'),
 		present: own.map((line) => line.match(/^([\w-]+)\s*:/)?.[1]).filter((key) => key !== undefined),
@@ -512,10 +531,10 @@ function fieldOfLine(text, lines, indent) {
  * @param {number} offset
  * @returns {({ prefix: string, start: number } & FieldAtLine) | null}
  */
-export function propertyContext(text, offset) {
+export function propertyContext(text, offset, partial = null) {
 	const { before, lines } = positionInfo(text, offset);
-	const match = before.match(/^( +)([\w-]*)$/);
-	const field = match === null ? null : fieldOfLine(text, lines, match[1].length);
+	const match = before.match(partial === null ? /^( +)([\w-]*)$/ : /^( *)([\w-]*)$/);
+	const field = match === null ? null : fieldOfLine(text, lines, match[1].length, partial);
 
 	return field === null ? null : { prefix: match[2], start: offset - match[2].length, ...field };
 }
@@ -527,10 +546,10 @@ export function propertyContext(text, offset) {
  * @param {number} offset
  * @returns {({ key: string, prefix: string, start: number } & FieldAtLine) | null}
  */
-export function valueContext(text, offset) {
+export function valueContext(text, offset, partial = null) {
 	const { before, lines } = positionInfo(text, offset);
-	const match = before.match(/^( +)([\w-]+):[ \t]+([\w-]*)$/);
-	const field = match === null ? null : fieldOfLine(text, lines, match[1].length);
+	const match = before.match(partial === null ? /^( +)([\w-]+):[ \t]+([\w-]*)$/ : /^( *)([\w-]+):[ \t]+([\w-]*)$/);
+	const field = match === null ? null : fieldOfLine(text, lines, match[1].length, partial);
 
 	return field === null ? null : { key: match[2], prefix: match[3], start: offset - match[3].length, ...field };
 }
@@ -874,4 +893,18 @@ const OPTION_VALUES = {
  */
 export function optionValues(type, option) {
 	return OPTION_VALUES[ALIASES[type] ?? type]?.[option] ?? [];
+}
+
+/**
+ * The field type under the cursor in `type: textarea`, with its docs (see `fieldTypes`)
+ * @param {string} text
+ * @param {number} offset
+ * @returns {{ name: string, replacement?: string, docs: string, start: number, end: number } | null}
+ */
+export function fieldTypeAt(text, offset) {
+	const end = offset + text.slice(offset).match(/^[\w-]*/)[0].length;
+	const context = typeContext(text, end);
+	const type = context === null ? undefined : fieldTypes().find(({ name }) => name === context.prefix);
+
+	return type === undefined ? null : { ...type, start: context.start, end };
 }

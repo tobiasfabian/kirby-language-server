@@ -15,7 +15,7 @@ import {
 	TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldKeyAt, fieldKeyOffset, optionValues, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
+import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldKeyAt, fieldKeyOffset, fieldTypeAt, optionValues, fieldMethods, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, fittingMethods, isFieldType, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from './blueprints.js';
 import { completionContext, fieldContext, fieldMethodContext, findCalls, memberAt, nameAt, propsContext, variableAt, variableContext } from './calls.js';
 import { classInfo, classMethods, closureInfo, collectionSignature, controllerVariables, findAsset, findSites, listBlueprints, listCollections, listControllers, listDocroot, listMethods, listModels, listSnippets, listStubs, listTemplates, listTranslations, readBlueprint, snippetProps, snippetVariables } from './project.js';
 import { isInPhp, phpOnly, undefinedVariables } from './variables.js';
@@ -421,7 +421,7 @@ function typeOfField(field, site) {
  * @param {string} site
  */
 function valueCompletion(document, position, site) {
-	const context = valueContext(document.getText(), document.offsetAt(position));
+	const context = valueContext(document.getText(), document.offsetAt(position), partialName(document, site));
 	const type = context === null ? null : typeOfField(context, site);
 	const option = context === null ? undefined : fieldProperties(type)?.find(({ name }) => name === context.key);
 	const values = option === undefined ? [] : [...optionValues(type, context.key), ...literalValues(option.type)];
@@ -757,7 +757,7 @@ function varDocCodeActions(document, site, range, diagnostics) {
  * @param {string} site
  */
 function propertyCompletion(document, position, site) {
-	const context = propertyContext(document.getText(), document.offsetAt(position));
+	const context = propertyContext(document.getText(), document.offsetAt(position), partialName(document, site));
 
 	if (context === null) {
 		return null;
@@ -821,6 +821,16 @@ function extendsCompletion(document, position, site) {
 function ownName(document, site) {
 	const file = fileURLToPath(document.uri);
 	return [...entriesOf(site, 'blueprint')].find(([, entry]) => entry.file === file)?.[0] ?? null;
+}
+
+/**
+ * The field's name if a document is a field partial (`fields/writer.yml`), whose top-level keys are the field's own
+ * @param {TextDocument} document
+ * @param {string} site
+ */
+function partialName(document, site) {
+	const name = ownName(document, site);
+	return name?.startsWith('fields/') ? name.slice('fields/'.length) : null;
 }
 
 /**
@@ -1655,6 +1665,19 @@ connection.onDefinition(({ textDocument, position }) => {
 });
 
 connection.onHover(({ textDocument, position }) => {
+	// A field type in a blueprint: a link to its docs
+	const document = documents.get(textDocument.uri);
+	const type = document !== undefined && isBlueprint(document) === true ? fieldTypeAt(document.getText(), document.offsetAt(position)) : null;
+
+	if (type !== null) {
+		const deprecated = type.replacement === undefined ? '' : ` · deprecated, use \`${type.replacement}\``;
+
+		return {
+			contents: { kind: MarkupKind.Markdown, value: `**${type.name}** field${deprecated} · [Kirby docs](${type.docs})` },
+			range: { start: document.positionAt(type.start), end: document.positionAt(type.end) },
+		};
+	}
+
 	const found = lookup(textDocument, position);
 
 	if (found === null) {

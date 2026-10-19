@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldProperties, fieldReferences, fieldsetReferences, fieldTypes, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from '../src/blueprints.js';
+import { blueprintFields, blueprintReferences, extend, extendsContext, fieldDefinitions, fieldProperties, fieldTypeAt, fieldReferences, fieldsetReferences, fieldTypes, listItemContext, literalValues, propertyContext, referenceAt, templateSlots, typeContext, valueContext } from '../src/blueprints.js';
 
 /**
  * Puts the cursor at `▮`
@@ -271,4 +271,10 @@ test('detects list items of fields and fieldsets', () => {
 	assert.equal(at('text:\n  fieldsets:\n    he▮')?.list, 'fieldsets');
 	assert.equal(at('tags:\n  options:\n    - ▮'), null);
 	assert.equal(at('fields:\n  intro:\n    ty▮'), null);
+});
+
+test('finds the field type under the cursor', () => {
+	assert.equal(fieldTypeAt('fields:\n  a:\n    type: textarea', 28)?.docs, 'https://getkirby.com/docs/reference/panel/fields/textarea');
+	assert.equal(fieldTypeAt('fields:\n  a:\n    type: files', 25)?.replacement, 'filepicker');
+	assert.equal(fieldTypeAt('fields:\n  a:\n    label: textarea', 25), null);
 });
