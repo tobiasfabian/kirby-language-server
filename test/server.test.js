@@ -202,8 +202,8 @@ test('warns about missing snippets, collections and translations', async () => {
 	assert.match(messages[3], /Translation “missing.key” not found/);
 	assert.match(messages[4], /Translation “missing.plural” not found/);
 	assert.match(messages[5], /File “assets\/images\/missing.svg” not found/);
-	assert.match(messages[6], /Template “missing-template” not found: no blueprint pages\/missing-template or files\/missing-template, no template missing-template.php and no page that uses it/);
-	assert.deepEqual(messages.slice(7), ['$page has no @var line, so PHP’s language server reports it as undefined. Kirby provides it.', '$kirby has no @var line, so PHP’s language server reports it as undefined. Kirby provides it.', '$site has no @var line, so PHP’s language server reports it as undefined. Kirby provides it.']);
+	assert.match(messages[6], /Template “missing-template” not found\./);
+	assert.deepEqual(messages.slice(7), ['Missing @var for $page (from Kirby)', 'Missing @var for $kirby (from Kirby)', 'Missing @var for $site (from Kirby)']);
 });
 
 test('checks collections in blueprint queries', async () => {
@@ -292,9 +292,9 @@ test('warns about blueprints that don’t exist', async () => {
 	const messages = await diagnosticsOf(uri);
 
 	assert.deepEqual(messages, [
-		'Blueprint “fields/gallery” not found. Kirby ignores it.',
-		'Blueprint “textarea” not found. Kirby ignores it. For a field type, use “type: textarea”.',
-		'Blueprint “tabs/missing” not found. Kirby ignores it.',
+		'Blueprint “fields/gallery” not found.',
+		'Blueprint “textarea” not found. Did you mean “type: textarea”?',
+		'Blueprint “tabs/missing” not found.',
 	]);
 });
 
@@ -324,9 +324,9 @@ test('warns about templates that don’t exist in blueprints', async () => {
 	const messages = await diagnosticsOf(uri);
 
 	assert.deepEqual(messages, [
-		'Template “missing-change” not found: no blueprint pages/missing-change, no template missing-change.php and no page that uses it.',
-		'Template “missing-page” not found: no blueprint pages/missing-page, no template missing-page.php and no page that uses it.',
-		'File template “missing-file” has no blueprint files/missing-file. Kirby uses files/default.',
+		'Template “missing-change” not found.',
+		'Template “missing-page” not found.',
+		'File template “missing-file” has no blueprint.',
 	]);
 });
 
@@ -496,7 +496,7 @@ test('completes, checks and opens the variables of a template’s controllers', 
 	assert.equal(items[0].textEdit.range.start.character, 4);
 
 	// $missing and $c are left to PHP's language server; $navigation and $cover need an @var line for it
-	assert.deepEqual(await diagnosticsOf(uri), ['navigation', 'cover'].map((name) => `$${name} has no @var line, so PHP’s language server reports it as undefined. The controller provides it.`));
+	assert.deepEqual(await diagnosticsOf(uri), ['navigation', 'cover'].map((name) => `Missing @var for $${name} (from the controller)`));
 
 	const [link] = await request('textDocument/definition', { textDocument: { uri }, position: position('$cover', 2) });
 	assert.equal(fileURLToPath(link.targetUri), `${project}/public/site/controllers/project.php`);
@@ -518,9 +518,9 @@ test('completes, checks and opens fields defined at the top and block types', as
 	const { uri, position } = openBlueprint('pages/article');
 
 	assert.deepEqual(await diagnosticsOf(uri), [
-		'Field “nope” is not defined in fields at the top of the blueprint. Kirby shows an error instead.',
-		'Block type “missing-block” not found: there is no blueprint blocks/missing-block, so the block has no fields.',
-		'Block type “blocks/custom-missing” not found: there is no blueprint blocks/custom-missing, so the block has no fields.',
+		'Field “nope” isn’t defined in the top-level fields.',
+		'Block type “missing-block” has no blueprint.',
+		'Block type “blocks/custom-missing” has no blueprint.',
 	]);
 
 	const fields = await request('textDocument/completion', { textDocument: { uri }, position: position('- nope', 2) });
@@ -575,7 +575,7 @@ test('offers and checks nothing in the HTML of a template', async () => {
 	assert.deepEqual(await request('textDocument/completion', { textDocument: { uri }, position: position("snippet('", 9) }), []);
 	assert.ok((await request('textDocument/completion', { textDocument: { uri }, position: position('<?= $page->', 11) })).some((item) => item.label === 'cover'));
 	assert.equal(await request('textDocument/hover', { textDocument: { uri }, position: position('$site->x', 2) }), null);
-	assert.deepEqual(await diagnosticsOf(uri), ['$page has no @var line, so PHP’s language server reports it as undefined. Kirby provides it.']);
+	assert.deepEqual(await diagnosticsOf(uri), ['Missing @var for $page (from Kirby)']);
 });
 
 test('leaves to PHP’s language server what types and docblocks tell it', async () => {
@@ -607,8 +607,8 @@ test('hints at @method lines of a model that are missing or stale, with quick fi
 	send({ method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'php', version: 1, text } } });
 
 	assert.deepEqual(await diagnosticsOf(uri), [
-		'pages/project has no field “oldField”, so PHP’s language server offers a field that doesn’t exist.',
-		'ProjectPage documents fields with @method, but not these of pages/project: gallery, intro, text, metaTitle, metaDescription. PHP’s language server doesn’t know them.',
+		'Field “oldField” isn’t in blueprint pages/project.',
+		'Missing @method for fields of blueprint pages/project: gallery, intro, text, metaTitle, metaDescription',
 	]);
 
 	const [add] = await request('textDocument/codeAction', { textDocument: { uri }, range: { start: { line: classLine, character: 0 }, end: { line: classLine, character: 0 } }, context: { diagnostics: [] } });

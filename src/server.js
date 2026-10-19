@@ -494,7 +494,7 @@ function modelDiagnostics(document, site) {
 	const diagnostics = docs.stale.map((method) => ({
 		severity: DiagnosticSeverity.Warning,
 		range: lineRange(method.line),
-		message: `${docs.blueprint} has no field “${method.name}”, so PHP’s language server offers a field that doesn’t exist.`,
+		message: `Field “${method.name}” isn’t in blueprint ${docs.blueprint}.`,
 		source: 'Kirby',
 		code: 'stale-method-doc',
 	}));
@@ -505,7 +505,7 @@ function modelDiagnostics(document, site) {
 		diagnostics.push({
 			severity: DiagnosticSeverity.Information,
 			range: lineRange(docs.info.line),
-			message: `${docs.info.name} documents fields with @method, but not these of ${docs.blueprint}: ${names}. PHP’s language server doesn’t know them.`,
+			message: `Missing @method for field${docs.missing.length === 1 ? '' : 's'} of blueprint ${docs.blueprint}: ${names}`,
 			source: 'Kirby',
 			code: 'missing-method-docs',
 		});
@@ -722,7 +722,7 @@ function varDocDiagnostics(document, site) {
 	return missingVarDocs(document, site).map(({ name, start, end }) => ({
 		severity: DiagnosticSeverity.Information,
 		range: { start: document.positionAt(start), end: document.positionAt(end) },
-		message: `$${name} has no @var line, so PHP’s language server reports it as undefined. ${TEMPLATE_DATA[name] === undefined ? 'The controller' : 'Kirby'} provides it.`,
+		message: `Missing @var for $${name} (from ${TEMPLATE_DATA[name] === undefined ? 'the controller' : 'Kirby'})`,
 		source: 'Kirby',
 		code: 'missing-var-doc',
 	}));
@@ -923,7 +923,7 @@ function referenceDiagnostics(document, site) {
 
 	for (const reference of definitions === null ? [] : fieldReferences(document.getText())) {
 		if (definitions.has(reference.name) === false) {
-			warn(reference.start, reference.end, `Field “${reference.name}” is not defined in fields at the top of the blueprint. Kirby shows an error instead.`);
+			warn(reference.start, reference.end, `Field “${reference.name}” isn’t defined in the top-level fields.`);
 		}
 	}
 
@@ -931,8 +931,8 @@ function referenceDiagnostics(document, site) {
 
 	for (const reference of fieldsetReferences(document.getText())) {
 		if (blueprints.has(reference.blueprint) === false) {
-			const message = `Block type “${reference.name}” not found: there is no blueprint ${reference.blueprint}, so the block has no fields.`;
-			warn(reference.start, reference.end, complete ? message : message + ' (Some plugins register blueprints in a way that couldn’t be read.)', complete ? DiagnosticSeverity.Warning : DiagnosticSeverity.Information);
+			const message = `Block type “${reference.name}” has no blueprint.`;
+			warn(reference.start, reference.end, complete ? message : message + ' (a plugin may add it)', complete ? DiagnosticSeverity.Warning : DiagnosticSeverity.Information);
 		}
 	}
 
@@ -1382,16 +1382,16 @@ function blueprintDiagnostics(document, site) {
 	const { blueprints, complete } = blueprintsOf(site);
 
 	return blueprintReferences(document.getText()).filter(({ name }) => blueprints.has(name) === false).map((reference) => {
-		let message = `Blueprint “${reference.name}” not found. Kirby ignores it.`;
+		let message = `Blueprint “${reference.name}” not found.`;
 
 		// `intro: textarea` isn't a type shorthand; Kirby takes the field name as type
 		if (reference.shorthand === true && isFieldType(reference.name) === true) {
-			message += ` For a field type, use “type: ${reference.name}”.`;
+			message += ` Did you mean “type: ${reference.name}”?`;
 		}
 
 		// A plugin we couldn't read may register it
 		if (complete === false) {
-			message += ' (Some plugins register blueprints in a way that couldn’t be read.)';
+			message += ' (a plugin may add it)';
 		}
 
 		return {
@@ -1414,15 +1414,14 @@ function blueprintDiagnostics(document, site) {
  */
 function templateDiagnostic(document, site, { name, start, end }, folder) {
 	const message = {
-		pages: `Template “${name}” not found: no blueprint pages/${name}, no template ${name}.php and no page that uses it.`,
-		files: `File template “${name}” has no blueprint files/${name}. Kirby uses files/default.`,
-	}[folder] ?? `Template “${name}” not found: no blueprint pages/${name} or files/${name}, no template ${name}.php and no page that uses it.`;
+		files: `File template “${name}” has no blueprint.`,
+	}[folder] ?? `Template “${name}” not found.`;
 	const { complete } = blueprintsOf(site);
 
 	return {
 		severity: complete === true && folder !== 'files' ? DiagnosticSeverity.Warning : DiagnosticSeverity.Information,
 		range: { start: document.positionAt(start), end: document.positionAt(end) },
-		message: complete === true ? message : message + ' (Some plugins register blueprints in a way that couldn’t be read.)',
+		message: complete === true ? message : message + ' (a plugin may add it)',
 		source: 'Kirby',
 	};
 }
@@ -1471,19 +1470,19 @@ function validate(document) {
 				continue;
 			}
 
-			message = `Translation ${list} not found. ${call.fn}() returns null.`;
+			message = `Translation ${list} not found.`;
 
 			// Some plugins load translations at runtime; then this is only a hint
 			if (complete === false) {
-				message += ' (Some plugins load translations at runtime and couldn’t be checked.)';
+				message += ' (a plugin may add it)';
 				severity = DiagnosticSeverity.Information;
 			}
 		} else if (call.kind === 'collection') {
-			message = `Collection ${list} not found. collection() returns null.`;
+			message = `Collection ${list} not found.`;
 		} else if (call.kind === 'asset') {
 			message = `File ${list} not found.`;
 		} else {
-			message = call.names.length === 1 ? `Snippet ${list} not found. Kirby renders nothing.` : `None of the snippets ${list} exist. Kirby renders nothing.`;
+			message = call.names.length === 1 ? `Snippet ${list} not found.` : `None of the snippets ${list} found.`;
 		}
 
 		diagnostics.push({
