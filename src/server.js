@@ -359,6 +359,9 @@ function valueCompletion(document, position, site) {
 // What Kirby gives every template
 const TEMPLATE_DATA = { kirby: 'Kirby\\Cms\\App', site: 'Kirby\\Cms\\Site', pages: 'Kirby\\Cms\\Pages', page: 'Kirby\\Cms\\Page' };
 
+// Every snippet has the template's data already; `$slot` and `$slots` can't be passed at all (Kirby throws)
+const SNIPPET_GLOBALS = new Set([...Object.keys(TEMPLATE_DATA), 'slot', 'slots']);
+
 /**
  * @typedef {{ entry: import('./project.js').Entry, value: string, controller: string }} TemplateVariable
  */
@@ -1232,7 +1235,7 @@ connection.onCompletion(({ textDocument, position }) => {
 		const snippet = props.names.map((name) => snippets.get(name)).find((entry) => entry !== undefined);
 		const range = { start: document.positionAt(props.start), end: position };
 
-		return snippet === undefined ? [] : snippetVariables(snippet.file).map((variable, index) => ({
+		return snippet === undefined ? [] : snippetVariables(snippet.file).filter(({ name }) => SNIPPET_GLOBALS.has(name) === false).map((variable, index) => ({
 			label: variable.name,
 			kind: CompletionItemKind.Property,
 			detail: [variable.type, variable.default === undefined ? undefined : `= ${shorten(variable.default)}`].filter(Boolean).join(' '),
